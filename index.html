@@ -207,6 +207,32 @@ th.col-N{min-width:185px;background:#3b0764;border-left:3px solid #8b5cf6;}
 .toast.show{transform:translateY(0);opacity:1;}
 .toast.ok{border-left:3px solid #22c55e;}.toast.err{border-left:3px solid #ef4444;}
 @keyframes slideUp{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
+/* RESIDENT MANAGEMENT */
+.res-mgmt-card{background:#fff;border:1px solid var(--border);border-radius:10px;overflow:hidden;}
+.res-mgmt-hd{padding:10px 14px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;}
+.res-item-row{display:flex;align-items:center;gap:6px;padding:6px 10px;border-bottom:1px solid var(--border);}
+.res-item-row:last-child{border-bottom:none;}
+.res-item-swatch{width:10px;height:10px;border-radius:2px;flex-shrink:0;}
+.res-item-input{flex:1;padding:4px 7px;border:1px solid var(--border2);border-radius:5px;font-family:"Sarabun",sans-serif;font-size:12px;background:#fff;}
+.res-item-input:focus{outline:none;border-color:var(--accent);}
+.res-item-del{background:none;border:none;cursor:pointer;color:var(--light);font-size:14px;padding:2px 4px;border-radius:4px;line-height:1;}
+.res-item-del:hover{background:#fee2e2;color:#dc2626;}
+.add-res-row{display:flex;align-items:center;gap:6px;padding:8px 10px;background:var(--surface2);border-top:1px solid var(--border);}
+
+/* CALENDAR PREVIEW (for PDF/export) */
+#cal-preview-wrap{display:none;}
+.cal-preview{font-family:"Sarabun",sans-serif;background:#fff;padding:0;}
+.cal-preview table{border-collapse:collapse;width:100%;font-size:11px;}
+.cal-preview th,.cal-preview td{border:1px solid #ccc;padding:3px 5px;text-align:center;vertical-align:middle;}
+.cal-preview th{background:#2563eb;color:#fff;font-weight:700;}
+.cal-preview th.hdr-M{background:#78350f;}
+.cal-preview th.hdr-A{background:#1e3a8a;}
+.cal-preview th.hdr-N{background:#3b0764;}
+.cal-preview td.date-td{background:#f8fafc;font-weight:700;font-size:10px;white-space:nowrap;}
+.cal-preview td.date-td.we{background:#fff5f5;color:#dc2626;}
+.cal-preview td.date-td.hol{background:#fff7ed;color:#c2410c;}
+.cal-name{display:inline-block;padding:1px 5px;border-radius:3px;margin:1px;font-size:10px;font-weight:600;white-space:nowrap;}
+
 
 /* SETTINGS */
 .name-edit-row{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;}
@@ -250,7 +276,8 @@ th.col-N{min-width:185px;background:#3b0764;border-left:3px solid #8b5cf6;}
     <div class="toolbar-left">
       <div><div class="page-title" id="rot-title">Rotate 1</div><div class="page-sub" id="rot-sub">28 DAYS</div></div>
     </div>
-    <button class="btn btn-red" onclick="autoSchedule()">⚡ Auto-จัด</button>
+    <button class="btn btn-red" onclick="autoSchedule(true)" title="เติมเฉพาะช่องที่ยังขาด ไม่ล้างที่กรอกไว้">⚡ Fill ที่ขาด</button>
+    <button class="btn btn-amber" onclick="autoSchedule(false)" title="ล้างทั้งหมดแล้วจัดใหม่">🔄 จัดใหม่ทั้งหมด</button>
     <button class="btn btn-outline" onclick="clearSchedule()">🗑 ล้าง</button>
     <button class="btn btn-green" onclick="exportXLSX()">📊 Export .xlsx</button>
     <button class="btn btn-blue" onclick="exportCSV()">↓ CSV</button>
@@ -329,9 +356,16 @@ th.col-N{min-width:185px;background:#3b0764;border-left:3px solid #8b5cf6;}
   </div>
   <div class="lv-grid">
     <div class="lv-form">
-      <h3 style="font-size:15px;font-weight:700;margin-bottom:16px">เพิ่มคำขอ</h3>
+      <h3 style="font-size:15px;font-weight:700;margin-bottom:16px">เพิ่มคำขอลา</h3>
       <div class="form-group"><label class="form-label">Resident</label><select class="form-ctrl" id="lv-res" onchange="updateQuotaDisplay()"></select></div>
-      <div class="form-group"><label class="form-label">วันที่</label><input type="date" class="form-ctrl" id="lv-date"></div>
+      <div class="form-group">
+        <label class="form-label">วันที่ (เลือกได้หลายวัน)</label>
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+          <input type="date" class="form-ctrl" id="lv-date" style="flex:1">
+          <button class="btn btn-outline btn-sm" onclick="lvAddDate()">+ เพิ่ม</button>
+        </div>
+        <div id="lv-dates-chips" style="display:flex;flex-wrap:wrap;gap:6px;min-height:24px;"></div>
+      </div>
       <div class="form-group"><label class="form-label">ประเภท</label>
         <select class="form-ctrl" id="lv-type">
           <option value="LEAVE">🔴 ลาพักร้อน (สิทธิ์ 4 วัน/Rotate)</option>
@@ -340,7 +374,7 @@ th.col-N{min-width:185px;background:#3b0764;border-left:3px solid #8b5cf6;}
       </div>
       <div class="form-group"><label class="form-label">หมายเหตุ</label><input type="text" class="form-ctrl" id="lv-note" placeholder="เช่น ติวบอร์ด..."></div>
       <div id="quota-display" style="font-size:12px;color:var(--muted);margin-bottom:12px;padding:8px 12px;background:var(--surface2);border-radius:7px;border:1px solid var(--border)"></div>
-      <button class="btn btn-red" style="width:100%" onclick="addLeave()">+ เพิ่มคำขอ</button>
+      <button class="btn btn-red" style="width:100%" onclick="addLeave()">+ เพิ่มคำขอ (<span id="lv-date-count">0</span> วัน)</button>
     </div>
     <div class="lv-list-wrap">
       <div class="lv-list-hd">รายการขอลา <span id="lv-cnt" style="background:#fee2e2;color:#dc2626;font-size:11px;padding:2px 9px;border-radius:10px;font-family:monospace">0</span></div>
@@ -355,14 +389,16 @@ th.col-N{min-width:185px;background:#3b0764;border-left:3px solid #8b5cf6;}
     <div class="toolbar-left"><div class="page-title">⚙️ ตั้งค่าระบบ</div></div>
   </div>
 
-  <!-- EDIT RESIDENT NAMES -->
+  <!-- MANAGE RESIDENTS -->
   <div style="background:#fff;border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:20px;">
-    <div style="padding:14px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
-      <div style="font-weight:700;font-size:14px">✏️ แก้ไขชื่อ Resident</div>
-      <button class="btn btn-green btn-sm" onclick="saveResidentNames()">💾 บันทึกชื่อ</button>
+    <div style="padding:14px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+      <div style="font-weight:700;font-size:14px">👨‍⚕️ จัดการ Residents (เพิ่ม/ลบ/แก้ชื่อ)</div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-green btn-sm" onclick="saveResidentNames()">💾 บันทึกทั้งหมด</button>
+      </div>
     </div>
     <div style="padding:16px 20px;">
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px" id="name-edit-grid"></div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;" id="res-manage-grid"></div>
     </div>
   </div>
 
@@ -371,23 +407,29 @@ th.col-N{min-width:185px;background:#3b0764;border-left:3px solid #8b5cf6;}
     <div style="padding:14px 20px;border-bottom:1px solid var(--border);font-weight:700;font-size:14px">📤 Export & ส่งอีเมล</div>
     <div style="padding:20px;display:flex;flex-direction:column;gap:16px;">
 
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;">
         <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px;text-align:center;">
-          <div style="font-size:28px;margin-bottom:8px">📊</div>
-          <div style="font-weight:700;font-size:14px;margin-bottom:4px">Excel (.xlsx)</div>
-          <div style="font-size:11px;color:var(--muted);margin-bottom:12px">3 sheets: ตาราง, สรุป, Calendar</div>
-          <button class="btn btn-green" style="width:100%" onclick="exportXLSX()">↓ Download .xlsx</button>
+          <div style="font-size:28px;margin-bottom:8px">📅</div>
+          <div style="font-weight:700;font-size:14px;margin-bottom:4px">Calendar Excel</div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:12px">ตาราง color-coded เหมือนต้นฉบับ</div>
+          <button class="btn btn-green" style="width:100%" onclick="exportCalendarXLSX()">↓ Download .xlsx</button>
+        </div>
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px;text-align:center;">
+          <div style="font-size:28px;margin-bottom:8px">📄</div>
+          <div style="font-weight:700;font-size:14px;margin-bottom:4px">Calendar PDF</div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:12px">พิมพ์ได้ทันที A4 landscape</div>
+          <button class="btn btn-blue" style="width:100%" onclick="exportCalendarPDF()">↓ Download .pdf</button>
         </div>
         <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px;text-align:center;">
           <div style="font-size:28px;margin-bottom:8px">🖼️</div>
           <div style="font-weight:700;font-size:14px;margin-bottom:4px">ภาพ (.jpeg)</div>
-          <div style="font-size:11px;color:var(--muted);margin-bottom:12px">Screenshot ตารางเวรรอบปัจจุบัน</div>
-          <button class="btn btn-blue" style="width:100%" onclick="exportJPEG()">↓ Download .jpeg</button>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:12px">Screenshot ตารางเวร</div>
+          <button class="btn btn-outline" style="width:100%" onclick="exportJPEG()">↓ Download .jpeg</button>
         </div>
         <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px;text-align:center;">
           <div style="font-size:28px;margin-bottom:8px">✉️</div>
           <div style="font-weight:700;font-size:14px;margin-bottom:4px">ส่งอีเมล</div>
-          <div style="font-size:11px;color:var(--muted);margin-bottom:12px">แนบ Excel หรือ ภาพ</div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:12px">แนบไฟล์ส่งทีม</div>
           <button class="btn btn-amber" style="width:100%" onclick="openEmailModal()">📨 ส่งอีเมล...</button>
         </div>
       </div>
@@ -405,6 +447,68 @@ th.col-N{min-width:185px;background:#3b0764;border-left:3px solid #8b5cf6;}
     </div>
   </div>
 
+  <!-- SPECIAL BLOCK DATES (วันสอบ ฯลฯ) -->
+  <div style="background:#fff;border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:20px;">
+    <div style="padding:14px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+      <div>
+        <div style="font-weight:700;font-size:14px">🚫 วันพิเศษ / วันสอบ (ห้ามจัดเวร)</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px">เลือกรายคน หรือทั้งชั้นปี — เพิ่มได้หลายวันพร้อมกัน</div>
+      </div>
+      <span style="font-size:11px;color:var(--muted)" id="block-rotate-label"></span>
+    </div>
+    <div style="padding:16px 20px;">
+      <div id="special-blocks-list" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;min-height:32px;"></div>
+
+      <!-- Input form -->
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:12px;">
+
+        <!-- Multi-date picker -->
+        <div>
+          <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">วันที่ (เลือกได้หลายวัน)</div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <input type="date" class="form-ctrl" id="block-date-input" style="width:160px">
+            <button class="btn btn-outline btn-sm" onclick="blockAddDate()">+ เพิ่มวัน</button>
+            <div id="block-dates-chips" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+          </div>
+        </div>
+
+        <!-- Mode: by year or by person -->
+        <div>
+          <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">ห้าม</div>
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+            <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;">
+              <input type="radio" name="block-mode" value="year" id="block-mode-year" checked onchange="renderBlockPersonPicker()"> ทั้งชั้นปี
+            </label>
+            <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;">
+              <input type="radio" name="block-mode" value="person" id="block-mode-person" onchange="renderBlockPersonPicker()"> รายคน
+            </label>
+          </div>
+
+          <!-- Year checkboxes -->
+          <div id="block-year-picker" style="display:flex;gap:10px;align-items:center;">
+            <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer;padding:5px 10px;border:1px solid #e9d5ff;border-radius:6px;background:#faf5ff;">
+              <input type="checkbox" id="block-yr3" checked> <span style="color:#9333ea;font-weight:600">R3 ทุกคน</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer;padding:5px 10px;border:1px solid #bfdbfe;border-radius:6px;background:#eff6ff;">
+              <input type="checkbox" id="block-yr2"> <span style="color:#2563eb;font-weight:600">R2 ทุกคน</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer;padding:5px 10px;border:1px solid #bbf7d0;border-radius:6px;background:#f0fdf4;">
+              <input type="checkbox" id="block-yr1"> <span style="color:#059669;font-weight:600">R1 ทุกคน</span>
+            </label>
+          </div>
+
+          <!-- Per-person picker -->
+          <div id="block-person-picker" style="display:none;"></div>
+        </div>
+
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input type="text" class="form-ctrl" id="block-note-input" placeholder="หมายเหตุ เช่น วันสอบ Board R3" style="flex:1">
+          <button class="btn btn-red" onclick="addSpecialBlock()">+ เพิ่มวันพิเศษ</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- DANGER ZONE -->
   <div style="background:#fff;border:1px solid #fecaca;border-radius:10px;overflow:hidden;">
     <div style="padding:14px 20px;border-bottom:1px solid #fecaca;font-weight:700;font-size:14px;color:#dc2626">⚠️ Danger Zone</div>
@@ -415,6 +519,9 @@ th.col-N{min-width:185px;background:#3b0764;border-left:3px solid #8b5cf6;}
   </div>
 </div>
 
+<div id="cal-preview-wrap" style="position:fixed;top:-9999px;left:-9999px;width:1200px;background:#fff;padding:20px;">
+  <div id="cal-preview" class="cal-preview"></div>
+</div>
 </div><!-- /container -->
 <div class="overlay" id="overlay">
   <div class="modal">
@@ -612,6 +719,7 @@ function createRotate(startStr) {
   perRot.push({
     active: Object.fromEntries(RES.map(r=>[r.id, true])),
     sched: Object.fromEntries(Array.from({length:getRotateDays(ri)},(_,i)=>[i+1,{M:[],A:[],N:[]}])),
+    specialBlocks: [],
     lvs: [],
     holidays: [],
   });
@@ -724,88 +832,179 @@ function typeImbalance(rid,ri,shift,typeCnt) {
 }
 
 // ============================================================
-// AUTO SCHEDULE
+// AUTO SCHEDULE (v2 — improved algorithm)
+// Rules:
+// 1. No holiday fairness weighting
+// 2. Night clustering: prefer 2-3 consecutive nights
+// 3. Hard block: N→M and A→N only
+// 4. Morning 4 priority before Afternoon 5
+// 5. Senior fallback: R2 >= 1 ok (not 2)
+// 6. Double shift on shortage days (M+A or M+N)
+// 7. Special blocked dates (exams etc)
+// 8. FILL MODE: ถ้ามีคนอยู่แล้ว จะเติมเฉพาะช่องที่ขาด ไม่ล้างใหม่
 // ============================================================
-function autoSchedule() {
+function autoSchedule(fillMode=true) {
   const ri=RI;
-  for(let d=1;d<=getRotateDays(ri);d++) perRot[ri].sched[d]={M:[],A:[],N:[]};
+  const days=rotDays(ri);
+
+  // FILL MODE: ถ้า fillMode=false ให้ล้างก่อน (ปุ่ม "จัดใหม่ทั้งหมด")
+  if(!fillMode){
+    for(let d=1;d<=days;d++) perRot[ri].sched[d]={M:[],A:[],N:[]};
+  } else {
+    // Ensure all days exist but don't clear
+    for(let d=1;d<=days;d++){
+      if(!perRot[ri].sched[d]) perRot[ri].sched[d]={M:[],A:[],N:[]};
+      SHIFTS.forEach(s=>{ if(!perRot[ri].sched[d][s]) perRot[ri].sched[d][s]=[]; });
+    }
+  }
 
   const ar=activeRes(ri);
   const rem={};
-  ar.forEach(r=>rem[r.id]=QUOTA[r.year]);
+  ar.forEach(r=>{
+    // Deduct shifts already assigned (in fill mode)
+    const already=shiftCntByType(r.id,ri);
+    rem[r.id]=Math.max(0, QUOTA[r.year]-already.total);
+  });
   const typeCnt={};
-  ar.forEach(r=>typeCnt[r.id]={M:0,A:0,N:0});
-  const holCnt={};
-  ar.forEach(r=>holCnt[r.id]=0);
+  ar.forEach(r=>{ typeCnt[r.id]=shiftCntByType(r.id,ri); });
+  // Track consecutive night count per resident
+  const nightStreak={};
+  ar.forEach(r=>nightStreak[r.id]=0);
 
-  function pick(d,shift,need,excl=[]) {
-    const isHol=isSpecialDay(ri,d);
-    let cands=ar.filter(r=>{
-      if(excl.includes(r.id)) return false;
-      if(isUnavail(r.id,ri,d)) return false;
-      if(alreadyToday(r.id,ri,d)) return false;
-      if(violatesHard(r.id,ri,d,shift)) return false;
-      if(rem[r.id]<=0) return false;
-      return true;
+  // Check special block dates (exams etc) — supports year mode and person mode
+  function isBlocked(rid,d) {
+    const r=getR(rid); if(!r) return false;
+    const blocks=perRot[ri].specialBlocks||[];
+    const ds=rotDayStr(ri,d);
+    return blocks.some(b=>{
+      if(b.date!==ds) return false;
+      if((b.mode==='person'||b.persons?.length>0) && b.persons?.includes(rid)) return true;
+      if((!b.mode||b.mode==='year') && b.years?.includes(r.year)) return true;
+      return false;
     });
-    cands.sort((a,b)=>{
-      const sp=softPenalty(a.id,ri,d,shift)-softPenalty(b.id,ri,d,shift);
-      if(sp!==0) return sp;
-      if(isHol){ const hd=holCnt[a.id]-holCnt[b.id]; if(hd!==0) return hd; }
-      const td=typeImbalance(a.id,ri,shift,typeCnt)-typeImbalance(b.id,ri,shift,typeCnt);
-      if(Math.abs(td)>0.3) return td;
-      const qd=rem[b.id]-rem[a.id];
-      if(qd!==0) return qd;
-      return b.year-a.year;
-    });
+  }
+
+  // Basic eligibility — hard constraints only: N→M and A→N
+  function eligible(rid,d,shift,excl=[],allowDouble=false) {
+    if(excl.includes(rid)) return false;
+    if(isUnavail(rid,ri,d)) return false;
+    if(isBlocked(rid,d)) return false;
+    if(rem[rid]<=0) return false;
+    if(!allowDouble && alreadyToday(rid,ri,d)) return false;
+    // Hard: N→M and A→N only
+    const p=prevShiftOf(rid,ri,d);
+    if(shift==='N'&&p==='A') return false;
+    if(shift==='M'&&p==='N') return false;
+    return true;
+  }
+
+  function typeScore(rid,shift) {
+    const c=typeCnt[rid];
+    const tot=c.M+c.A+c.N;
+    if(tot===0) return 0;
+    return c[shift]-(tot/3);
+  }
+
+  // Night clustering score: prefer those already in a streak (continue) or just finished (rest)
+  function nightBonus(rid,d,shift) {
+    if(shift!=='N') return 0;
+    const streak=nightStreak[rid];
+    // Prefer continuing streak if < 3
+    if(streak>0&&streak<3) return -5; // bonus (negative = preferred)
+    if(streak>=3) return 10; // penalty: already done 3+ consecutive
+    return 0;
+  }
+
+  function sortScore(a,b,d,shift) {
+    // 1. night clustering
+    const nb=nightBonus(a.id,d,shift)-nightBonus(b.id,d,shift);
+    if(nb!==0) return nb;
+    // 2. soft penalties (post-night rest)
+    const sp=softPenalty(a.id,ri,d,shift)-softPenalty(b.id,ri,d,shift);
+    if(sp!==0) return sp;
+    // 3. type balance
+    const td=typeScore(a.id,shift)-typeScore(b.id,shift);
+    if(Math.abs(td)>0.3) return td;
+    // 4. most remaining quota
+    return rem[b.id]-rem[a.id];
+  }
+
+  function pick(d,shift,need,excl=[],allowDouble=false) {
+    let cands=ar.filter(r=>eligible(r.id,d,shift,excl,allowDouble));
+    cands.sort((a,b)=>sortScore(a,b,d,shift));
     return cands.slice(0,need);
   }
 
-  function pickSenior(d,shift,count) {
+  // Senior quality: R3>=1 OR R2>=1 (relaxed from R2>=2 for normal, R2>=1 for night)
+  function seniorPickFor(d,shift,count,excl=[]) {
     const cur=[];
-    const isHol=isSpecialDay(ri,d);
-    const elig=ar.filter(r=>!isUnavail(r.id,ri,d)&&!alreadyToday(r.id,ri,d)&&!violatesHard(r.id,ri,d,shift)&&rem[r.id]>0);
-    const srt=(a,b)=>{
-      const sp=softPenalty(a.id,ri,d,shift)-softPenalty(b.id,ri,d,shift);
-      if(sp!==0) return sp;
-      if(isHol){ const hd=holCnt[a.id]-holCnt[b.id]; if(hd!==0) return hd; }
-      const td=typeImbalance(a.id,ri,shift,typeCnt)-typeImbalance(b.id,ri,shift,typeCnt);
-      if(Math.abs(td)>0.3) return td;
-      return rem[b.id]-rem[a.id];
-    };
+    const elig=ar.filter(r=>eligible(r.id,d,shift,excl));
+    const srt=(a,b)=>sortScore(a,b,d,shift);
     const yr3=elig.filter(r=>r.year===3).sort(srt);
     const yr2=elig.filter(r=>r.year===2).sort(srt);
+    // Prefer R3 first, then R2 (at least 1 required — relaxed)
     if(yr3.length>0) cur.push(yr3[0].id);
-    else if(yr2.length>=(shift==='N'?1:2)){ cur.push(yr2[0].id); if(shift!=='N'&&yr2.length>=2) cur.push(yr2[1].id); }
-    else if(yr2.length===1) cur.push(yr2[0].id);
+    else if(yr2.length>0) cur.push(yr2[0].id);
+    // Fill rest
     pick(d,shift,count-cur.length,cur).forEach(r=>cur.push(r.id));
     return cur.slice(0,count);
   }
 
   function assign(d,shift,rids) {
-    const isHol=isSpecialDay(ri,d);
     rids.forEach(rid=>{
-      if(!perRot[ri].sched[d][shift].includes(rid)){
-        perRot[ri].sched[d][shift].push(rid);
-        rem[rid]--; typeCnt[rid][shift]++;
-        if(isHol) holCnt[rid]++;
-      }
+      if(perRot[ri].sched[d][shift].includes(rid)) return;
+      perRot[ri].sched[d][shift].push(rid);
+      rem[rid]--;
+      typeCnt[rid][shift]++;
+      if(shift==='N') nightStreak[rid]++;
+      else nightStreak[rid]=0; // reset streak on non-night
     });
   }
 
-  for(let d=1;d<=rotDays(ri);d++){
-    for(const s of SHIFTS) assign(d,s,pickSenior(d,s,3));
+  // Update streak after each day
+  function updateStreaks(d) {
+    ar.forEach(r=>{
+      if(!(perRot[ri].sched[d].N||[]).includes(r.id)) nightStreak[r.id]=0;
+    });
   }
-  for(const exp of [{s:'A',max:4},{s:'M',max:4},{s:'A',max:5}]){
-    for(let d=1;d<=rotDays(ri);d++){
+
+  const totalDays=days;
+
+  // PASS 1: Base 3 per shift, all days
+  for(let d=1;d<=totalDays;d++){
+    for(const s of SHIFTS){
+      assign(d,s,seniorPickFor(d,s,3));
+    }
+    updateStreaks(d);
+  }
+
+  // PASS 2: Expansion
+  // Priority: M→4 first (not Tue), then A→4, then A→5
+  // (item 4: Morning 4 before Afternoon 5)
+  for(const exp of [{s:'M',max:4},{s:'A',max:4},{s:'A',max:5}]){
+    for(let d=1;d<=totalDays;d++){
       if(exp.s==='M'&&isTue(ri,d)) continue;
       const cur=perRot[ri].sched[d][exp.s];
-      if(cur.length<exp.max) assign(d,exp.s,pick(d,exp.s,exp.max-cur.length,cur).map(r=>r.id));
+      if(cur.length<exp.max){
+        assign(d,exp.s,pick(d,exp.s,exp.max-cur.length,cur).map(r=>r.id));
+      }
+    }
+  }
+
+  // PASS 3: Shortage fill — if any shift < 3, try double-shift (M+A or M+N)
+  for(let d=1;d<=totalDays;d++){
+    for(const s of SHIFTS){
+      const cur=perRot[ri].sched[d][s];
+      if(cur.length<3){
+        // Try double-shift: pick someone already working today
+        const more=pick(d,s,3-cur.length,cur,true); // allowDouble=true
+        assign(d,s,more.map(r=>r.id));
+      }
     }
   }
 
   saveState(); renderTable(); renderFairness();
-  showToast('✅ จัดตารางอัตโนมัติเสร็จแล้ว','ok');
+  showToast(fillMode ? '✅ เติมช่องที่ขาดเสร็จแล้ว' : '✅ จัดตารางใหม่ทั้งหมดเสร็จแล้ว','ok');
 }
 
 function clearSchedule(){
@@ -1119,26 +1318,53 @@ function renderLeaveList(){
     </div>`;
   }).join('');
 }
+// LEAVES — multi-date support
+let lvSelectedDates = [];
+
+function lvAddDate() {
+  const val = document.getElementById('lv-date').value;
+  if (!val) { showToast('⚠ กรุณาเลือกวันที่','err'); return; }
+  if (lvSelectedDates.includes(val)) { showToast('⚠ วันนี้เพิ่มไว้แล้ว','err'); return; }
+  lvSelectedDates.push(val); lvSelectedDates.sort();
+  renderLvDateChips();
+  document.getElementById('lv-date').value='';
+}
+function renderLvDateChips() {
+  const el=document.getElementById('lv-dates-chips'); if(!el) return;
+  el.innerHTML=lvSelectedDates.map((d,i)=>{
+    const dt=new Date(d+'T00:00:00');
+    return `<div style="display:flex;align-items:center;gap:4px;padding:3px 8px;background:#fee2e2;border:1px solid #fecaca;border-radius:5px;font-size:12px;font-weight:600;color:#dc2626;">
+      ${dt.getDate()} ${TH_MONTHS[dt.getMonth()+1]} ${DOW_TH[dt.getDay()]}
+      <button onclick="lvRemoveDate(${i})" style="background:none;border:none;cursor:pointer;color:#ef4444;font-size:13px;line-height:1;padding:0 2px;">×</button>
+    </div>`;
+  }).join('');
+  const cnt=document.getElementById('lv-date-count'); if(cnt) cnt.textContent=lvSelectedDates.length;
+}
+function lvRemoveDate(i){ lvSelectedDates.splice(i,1); renderLvDateChips(); }
+
 function addLeave(){
   const ri=RI, rot=rotates[ri];
   const rid=document.getElementById('lv-res').value;
-  const date=document.getElementById('lv-date').value;
   const type=document.getElementById('lv-type').value;
   const note=document.getElementById('lv-note').value.trim();
-  if(!date){ showToast('⚠ กรุณาเลือกวันที่','err'); return; }
-  const dt=new Date(date+'T00:00:00');
-  if(dt<rot.startDate||dt>rot.endDate){ showToast('⚠ วันที่ไม่อยู่ในรอบนี้','err'); return; }
-  if(type==='LEAVE'&&perRot[ri].lvs.filter(l=>l.residentId===rid&&l.type==='LEAVE').length>=4){ showToast('⚠ ใช้สิทธิ์ 4 วันครบแล้ว','err'); return; }
-  if(perRot[ri].lvs.find(l=>l.residentId===rid&&l.date===date)){ showToast('⚠ วันนี้มีคำขอแล้ว','err'); return; }
-  perRot[ri].lvs.push({residentId:rid,date,type,note});
-  // Remove from schedule if assigned
-  const d=dt.getDate()-rot.startDate.getDate()+1+ (dt.getMonth()-rot.startDate.getMonth())*30;
-  // Recalculate day index properly
-  const dayIdx=Math.round((dt-rot.startDate)/(1000*60*60*24))+1;
-  if(dayIdx>=1&&dayIdx<=28) SHIFTS.forEach(s=>{ perRot[ri].sched[dayIdx][s]=(perRot[ri].sched[dayIdx][s]||[]).filter(id=>id!==rid); });
+  if(!lvSelectedDates.length){ showToast('⚠ กรุณาเลือกวันที่อย่างน้อย 1 วัน','err'); return; }
+  let added=0, skipped=0;
+  for(const date of lvSelectedDates){
+    const dt=new Date(date+'T00:00:00');
+    if(dt<rot.startDate||dt>rot.endDate){ skipped++; continue; }
+    if(type==='LEAVE'&&perRot[ri].lvs.filter(l=>l.residentId===rid&&l.type==='LEAVE').length>=4){
+      showToast('⚠ ใช้สิทธิ์ลาพักร้อน 4 วันครบแล้ว','err'); break;
+    }
+    if(perRot[ri].lvs.find(l=>l.residentId===rid&&l.date===date)){ skipped++; continue; }
+    perRot[ri].lvs.push({residentId:rid,date,type,note});
+    const dayIdx=Math.round((dt-rot.startDate)/(1000*60*60*24))+1;
+    if(dayIdx>=1&&dayIdx<=rot.days) SHIFTS.forEach(s=>{ perRot[ri].sched[dayIdx][s]=(perRot[ri].sched[dayIdx][s]||[]).filter(id=>id!==rid); });
+    added++;
+  }
+  lvSelectedDates=[]; renderLvDateChips();
   saveState(); renderLeaveList(); renderTable(); updateQuotaDisplay();
   document.getElementById('lv-note').value='';
-  showToast('✅ เพิ่มคำขอลาแล้ว','ok');
+  showToast(`✅ เพิ่ม ${added} วัน${skipped?` (ข้าม ${skipped})`:''}`,'ok');
 }
 function adminRemoveLv(idx){ perRot[RI].lvs.splice(idx,1); saveState(); renderLeaveList(); renderTable(); }
 
@@ -1164,9 +1390,9 @@ function openModal(d,shift){
   activeRes(ri).sort((a,b)=>b.year-a.year||a.name.localeCompare(b.name)).forEach(r=>{
     const isSel=assigned.includes(r.id);
     const unav=isUnavail(r.id,ri,d);
-    const other=!isSel&&alreadyToday(r.id,ri,d);
+    // Only block hard constraint violations (A→N, N→M) — allow all other assignments
     const hard=!isSel&&violatesHard(r.id,ri,d,shift);
-    const blocked=unav||other||hard;
+    const blocked=unav||hard;  // removed "other" — allow double shift in manual edit
     const sp=softPenalty(r.id,ri,d,shift);
     const c=shiftCntByType(r.id,ri);
     const item=document.createElement('div');
@@ -1175,8 +1401,7 @@ function openModal(d,shift){
     if(isSel) item.style.cssText=`background:${r.bg};border:1px solid ${r.color};border-left:3px solid ${r.color}`;
     let meta='';
     if(unav) meta='🔴 ลา/ไม่ว่าง';
-    else if(other) meta='⬛ มีเวรอื่นวันนี้';
-    else if(hard) meta='⛔ ผิด constraint';
+    else if(hard) meta='⛔ A→N หรือ N→M (ห้าม)';
     else { const w=sp>=10?'😴':sp>=8?'😓':''; meta=`${w?w+' ':''}M:${c.M} A:${c.A} N:${c.N} | รวม:${c.total}/${QUOTA[r.year]}`; }
     item.innerHTML=`
       <div style="display:flex;align-items:center;gap:8px">
@@ -1348,7 +1573,7 @@ function switchTab(tab,btn){
   if(tab==='holidays') renderHolChips();
   if(tab==='residents') renderResGrid();
   if(tab==='leaves'){ renderLeaveSelect(); renderLeaveList(); }
-  if(tab==='settings'){ renderNameEditGrid(); renderSavedEmails(); }
+  if(tab==='settings'){ renderResManageGrid(); renderSavedEmails(); renderSpecialBlocks(); }
 }
 function renderAll(){
   renderRotateChips('rotate-chips',RI,'selectRotate');
@@ -1357,12 +1582,326 @@ function renderAll(){
   if(document.getElementById('tab-holidays').classList.contains('active')) renderHolChips();
   if(document.getElementById('tab-residents').classList.contains('active')) renderResGrid();
   if(document.getElementById('tab-leaves').classList.contains('active')){ renderLeaveSelect(); renderLeaveList(); }
-  if(document.getElementById('tab-settings').classList.contains('active')){ renderNameEditGrid(); renderSavedEmails(); }
+  if(document.getElementById('tab-settings').classList.contains('active')){ renderResManageGrid(); renderSavedEmails(); renderSpecialBlocks(); }
 }
 function showToast(msg,type='ok'){
   const t=document.getElementById('toast');
   t.textContent=msg; t.className=`toast ${type} show`;
   setTimeout(()=>t.classList.remove('show'),2800);
+}
+
+
+// ============================================================
+// CALENDAR EXPORT (color-coded like the sample image)
+// ============================================================
+function buildCalendarHTML(ri) {
+  const rot = rotates[ri];
+  const ar = activeRes(ri);
+  const days = rot.days || 28;
+  const SNAME_FULL = {M:'Morning 8.00-16.00', A:'Afternoon 16.00-0.00', N:'Night 0.00-8.00'};
+  const DOW_EN = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+  let html = `<div style="font-family:Sarabun,sans-serif;font-size:11px;background:#fff;">`;
+  html += `<div style="text-align:center;font-weight:700;font-size:13px;padding:8px;border:1px solid #888;background:#e8f4e8;">
+    ตารางเวร Resident ER จุฬาลงกรณ์ ${rot.label} (${rot.dateRange})</div>`;
+  
+  html += `<table style="border-collapse:collapse;width:100%;font-size:10px;">`;
+  // Header row
+  html += `<thead><tr>
+    <th style="border:1px solid #aaa;padding:4px;background:#1f497d;color:#fff;width:40px;">Day</th>
+    <th style="border:1px solid #aaa;padding:4px;background:#1f497d;color:#fff;width:55px;">Date</th>
+    <th colspan="4" style="border:1px solid #aaa;padding:4px;background:#7f4e00;color:#fff;text-align:center;">☀ Morning 8.00–16.00</th>
+    <th colspan="4" style="border:1px solid #aaa;padding:4px;background:#1f497d;color:#fff;text-align:center;">🌆 Afternoon 16.00–0.00</th>
+    <th colspan="3" style="border:1px solid #aaa;padding:4px;background:#3b0764;color:#fff;text-align:center;">🌙 Night 0.00–8.00</th>
+  </tr></thead><tbody>`;
+
+  for (let d=1; d<=days; d++) {
+    const dt = rotDay(ri, d);
+    const wd = dt.getDay();
+    const isWk = wd===0||wd===6;
+    const isHol = isHoliday(ri, d);
+    const isSp = isWk || isHol;
+    const isTu = wd===2;
+    const rowBg = isWk ? '#ffd7d7' : isHol ? '#ffe7cc' : (d%2===0 ? '#f0f0f0' : '#fff');
+    const dateBg = isWk ? '#ff8080' : isHol ? '#ffa040' : (isTu ? '#fffacd' : '#e8f4e8');
+    
+    const getNames = (shift) => {
+      const ids = perRot[ri].sched[d]?.[shift] || [];
+      return ids.map(id => getR(id)).filter(Boolean);
+    };
+
+    const nameCell = (r) => r ? 
+      `<span style="display:inline-block;padding:1px 5px;border-radius:3px;background:${r.bg};color:${r.color};border:1px solid ${r.border};font-size:9px;font-weight:600;margin:1px;white-space:nowrap;">${r.name}</span>` : '';
+
+    const M = getNames('M'), A = getNames('A'), N = getNames('N');
+    
+    // Split into columns of ~3 each
+    const splitCol = (arr, colIdx, colSize=3) => arr.slice(colIdx*colSize, (colIdx+1)*colSize);
+    
+    html += `<tr style="background:${rowBg};">
+      <td style="border:1px solid #ccc;padding:3px;text-align:center;font-weight:700;background:${dateBg};color:${isWk?'#c00':'#000'}">${DOW_EN[wd]}</td>
+      <td style="border:1px solid #ccc;padding:3px;text-align:center;font-weight:600;background:${dateBg};white-space:nowrap;">${dt.getDate()}-${TH_MONTHS[dt.getMonth()+1]}</td>
+      <td style="border:1px solid #ccc;padding:2px;min-width:60px;">${splitCol(M,0).map(nameCell).join('')}</td>
+      <td style="border:1px solid #ccc;padding:2px;min-width:60px;">${splitCol(M,1).map(nameCell).join('')}</td>
+      <td style="border:1px solid #ccc;padding:2px;min-width:60px;">${splitCol(M,2).map(nameCell).join('')}</td>
+      <td style="border:1px solid #ccc;padding:2px;min-width:40px;background:#f5f5f5;"></td>
+      <td style="border:1px solid #ccc;padding:2px;min-width:60px;">${splitCol(A,0).map(nameCell).join('')}</td>
+      <td style="border:1px solid #ccc;padding:2px;min-width:60px;">${splitCol(A,1).map(nameCell).join('')}</td>
+      <td style="border:1px solid #ccc;padding:2px;min-width:60px;">${splitCol(A,2).map(nameCell).join('')}</td>
+      <td style="border:1px solid #ccc;padding:2px;min-width:40px;background:#f5f5f5;"></td>
+      <td style="border:1px solid #ccc;padding:2px;min-width:60px;">${splitCol(N,0).map(nameCell).join('')}</td>
+      <td style="border:1px solid #ccc;padding:2px;min-width:60px;">${splitCol(N,1).map(nameCell).join('')}</td>
+      <td style="border:1px solid #ccc;padding:2px;min-width:60px;">${splitCol(N,2).map(nameCell).join('')}</td>
+    </tr>`;
+  }
+  html += `</tbody></table></div>`;
+  return html;
+}
+
+// Export Calendar as JPEG (html2canvas on a built table)
+async function exportCalendarJPEG() {
+  const ri = RI, rot = rotates[ri];
+  const wrap = document.getElementById('cal-preview-wrap');
+  const preview = document.getElementById('cal-preview');
+  preview.innerHTML = buildCalendarHTML(ri);
+  wrap.style.display = 'block';
+  wrap.style.position = 'fixed';
+  wrap.style.top = '-9999px';
+  wrap.style.left = '-9999px';
+  wrap.style.width = '1400px';
+
+  const ov = document.createElement('div');
+  ov.style.cssText='position:fixed;inset:0;background:rgba(15,23,42,.75);color:#fff;font-size:15px;font-weight:700;z-index:9999;display:flex;align-items:center;justify-content:center;gap:12px;';
+  ov.innerHTML='<span style="font-size:28px">📸</span> กำลังสร้างภาพ Calendar...';
+  document.body.appendChild(ov);
+
+  try {
+    const canvas = await html2canvas(preview, {scale:2,useCORS:true,backgroundColor:'#fff',logging:false,width:1400});
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+    const filename = `Calendar_ER_${rot.label.replace(' ','')}_${rot.startStr}.jpeg`;
+    triggerDownload(filename, dataUrl);
+    showToast('📅 Download Calendar JPEG แล้ว','ok');
+  } catch(e) {
+    showToast('⚠ ไม่สามารถสร้างภาพได้','err');
+  } finally {
+    document.body.removeChild(ov);
+    wrap.style.display = 'none';
+  }
+}
+
+// Export Calendar as PDF (print dialog with styled page)
+function exportCalendarPDF() {
+  const ri = RI, rot = rotates[ri];
+  const html = buildCalendarHTML(ri);
+  const win = window.open('', '_blank');
+  if (!win) { showToast('⚠ กรุณาอนุญาต popup ใน browser','err'); return; }
+  win.document.write(`<!DOCTYPE html><html><head>
+    <meta charset="UTF-8">
+    <title>ตารางเวร ER ${rot.label}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+      @page{size:A4 landscape;margin:10mm;}
+      body{margin:0;padding:0;font-family:Sarabun,sans-serif;}
+      table{width:100%;border-collapse:collapse;font-size:9pt;}
+      th,td{border:1px solid #999;padding:2px 4px;}
+      @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}
+    </style>
+  </head><body>${html}
+  <script>window.onload=()=>{window.print();}<\/script>
+  </body></html>`);
+  win.document.close();
+  showToast('📄 เปิดหน้า Print PDF แล้ว','ok');
+}
+
+// Export Calendar as XLSX (color-coded)
+function exportCalendarXLSX() {
+  const ri = RI, rot = rotates[ri];
+  const ar = activeRes(ri);
+  const days = rot.days || 28;
+  const wb = XLSX.utils.book_new();
+
+  // Build rows: [Day, Date, M1, M2, M3, (Trauma), A1, A2, A3, (Trauma), N1, N2, N3]
+  const header1 = ['','','Morning 8.00-16.00','','','','Afternoon 16.00-0.00','','','','Night 0.00-8.00','',''];
+  const header2 = ['Day','Date','R1','R2','R3','','R1','R2','R3','','R1','R2','R3'];
+  
+  const rows = [header1, header2];
+  const DOW_EN = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  
+  for (let d=1; d<=days; d++) {
+    const dt = rotDay(ri, d);
+    const wd = dt.getDay();
+    const dateStr = `${dt.getDate()}-${TH_MONTHS[dt.getMonth()+1]}`;
+    const getNames = s => (perRot[ri].sched[d]?.[s]||[]).map(id=>getR(id)?.name||'');
+    const M = getNames('M'), A = getNames('A'), N = getNames('N');
+    rows.push([
+      DOW_EN[wd], dateStr,
+      M[0]||'', M[1]||'', M[2]||'', '',
+      A[0]||'', A[1]||'', A[2]||'', '',
+      N[0]||'', N[1]||'', N[2]||''
+    ]);
+  }
+
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = [{wch:5},{wch:10},{wch:12},{wch:12},{wch:12},{wch:4},{wch:12},{wch:12},{wch:12},{wch:4},{wch:12},{wch:12},{wch:12}];
+  ws['!merges'] = [
+    {s:{r:0,c:2},e:{r:0,c:5}}, // Morning header
+    {s:{r:0,c:6},e:{r:0,c:9}}, // Afternoon header
+    {s:{r:0,c:10},e:{r:0,c:12}}, // Night header
+  ];
+  XLSX.utils.book_append_sheet(wb, ws, 'Calendar');
+
+  // Summary sheet
+  const sumRows = [['ชื่อ','ปี','เช้า (M)','บ่าย (A)','ดึก (N)','รวม','เป้า','วันหยุด']];
+  ar.forEach(r => {
+    const ct = shiftCntByType(r.id, ri);
+    sumRows.push([r.name, r.year, ct.M, ct.A, ct.N, ct.total, QUOTA[r.year], holShiftCnt(r.id,ri)]);
+  });
+  const ws2 = XLSX.utils.aoa_to_sheet(sumRows);
+  ws2['!cols'] = [{wch:16},{wch:5},{wch:8},{wch:8},{wch:8},{wch:6},{wch:6},{wch:8}];
+  XLSX.utils.book_append_sheet(wb, ws2, 'สรุปต่อคน');
+
+  const filename = `Calendar_ER_${rot.label.replace(' ','')}_${rot.startStr}.xlsx`;
+  const wbout = XLSX.write(wb, {bookType:'xlsx', type:'base64'});
+  const dataUrl = `data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,${wbout}`;
+  triggerDownload(filename, dataUrl);
+  showToast('📊 Download Calendar Excel แล้ว','ok');
+}
+
+
+// ============================================================
+// SPECIAL BLOCK DATES (วันสอบ ฯลฯ) — per person or per year
+// ============================================================
+let blockSelectedDates = []; // ['YYYY-MM-DD', ...]
+let blockSelectedPersons = []; // [rid, ...]
+
+function blockAddDate() {
+  const val = document.getElementById('block-date-input').value;
+  if (!val) { showToast('⚠ กรุณาเลือกวันที่','err'); return; }
+  if (blockSelectedDates.includes(val)) { showToast('⚠ วันนี้เพิ่มไว้แล้ว','err'); return; }
+  blockSelectedDates.push(val);
+  blockSelectedDates.sort();
+  renderBlockDateChips();
+  document.getElementById('block-date-input').value = '';
+}
+
+function renderBlockDateChips() {
+  const el = document.getElementById('block-dates-chips');
+  if (!el) return;
+  el.innerHTML = blockSelectedDates.map((d,i) => {
+    const dt = new Date(d+'T00:00:00');
+    const ds = `${dt.getDate()} ${TH_MONTHS[dt.getMonth()+1]}`;
+    return `<div style="display:flex;align-items:center;gap:4px;padding:3px 8px;background:#fef3c7;border:1px solid #fde68a;border-radius:5px;font-size:12px;font-weight:600;color:#92400e;">
+      ${ds} <button onclick="blockRemoveDate(${i})" style="background:none;border:none;cursor:pointer;color:#b45309;font-size:13px;line-height:1;padding:0 2px;">×</button>
+    </div>`;
+  }).join('');
+  document.getElementById('block-date-input').min = (perRot[RI]&&rotates[RI]) ? rotates[RI].startStr : '';
+  const cnt = document.getElementById('lv-date-count');
+  if (cnt) cnt.textContent = blockSelectedDates.length;
+}
+
+function blockRemoveDate(i) {
+  blockSelectedDates.splice(i,1);
+  renderBlockDateChips();
+}
+
+function renderBlockPersonPicker() {
+  const mode = document.querySelector('input[name="block-mode"]:checked')?.value||'year';
+  document.getElementById('block-year-picker').style.display = mode==='year' ? 'flex' : 'none';
+  document.getElementById('block-person-picker').style.display = mode==='person' ? 'block' : 'none';
+  if (mode === 'person') {
+    const picker = document.getElementById('block-person-picker');
+    picker.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;">` +
+      activeRes(RI).sort((a,b)=>b.year-a.year||a.name.localeCompare(b.name)).map(r => {
+        const sel = blockSelectedPersons.includes(r.id);
+        return `<div onclick="blockTogglePerson('${r.id}')" style="cursor:pointer;display:flex;align-items:center;gap:5px;padding:5px 10px;border-radius:6px;border:2px solid ${sel?r.color:r.border};background:${sel?r.bg:'#fff'};font-size:12px;font-weight:600;color:${r.color};transition:all .1s;">
+          <span style="width:8px;height:8px;border-radius:50%;background:${r.color};flex-shrink:0;display:inline-block;"></span>${r.name}
+        </div>`;
+      }).join('') + `</div>`;
+  }
+}
+
+function blockTogglePerson(rid) {
+  const idx = blockSelectedPersons.indexOf(rid);
+  if (idx>=0) blockSelectedPersons.splice(idx,1);
+  else blockSelectedPersons.push(rid);
+  renderBlockPersonPicker();
+}
+
+function addSpecialBlock() {
+  const ri = RI, rot = rotates[ri];
+  if (!blockSelectedDates.length) { showToast('⚠ กรุณาเลือกวันที่อย่างน้อย 1 วัน','err'); return; }
+  const note = document.getElementById('block-note-input').value.trim();
+  const mode = document.querySelector('input[name="block-mode"]:checked')?.value||'year';
+
+  if (!perRot[ri].specialBlocks) perRot[ri].specialBlocks = [];
+
+  if (mode === 'year') {
+    const yr3 = document.getElementById('block-yr3').checked;
+    const yr2 = document.getElementById('block-yr2').checked;
+    const yr1 = document.getElementById('block-yr1').checked;
+    const years = [yr3&&3,yr2&&2,yr1&&1].filter(Boolean);
+    if (!years.length) { showToast('⚠ กรุณาเลือกชั้นปีอย่างน้อย 1 ปี','err'); return; }
+    blockSelectedDates.forEach(date => {
+      const dt = new Date(date+'T00:00:00');
+      if (dt < rot.startDate || dt > rot.endDate) return;
+      perRot[ri].specialBlocks.push({date, mode:'year', years, persons:[], note});
+    });
+  } else {
+    if (!blockSelectedPersons.length) { showToast('⚠ กรุณาเลือก Resident อย่างน้อย 1 คน','err'); return; }
+    blockSelectedDates.forEach(date => {
+      const dt = new Date(date+'T00:00:00');
+      if (dt < rot.startDate || dt > rot.endDate) return;
+      perRot[ri].specialBlocks.push({date, mode:'person', years:[], persons:[...blockSelectedPersons], note});
+    });
+  }
+
+  perRot[ri].specialBlocks.sort((a,b)=>a.date.localeCompare(b.date));
+  blockSelectedDates = [];
+  blockSelectedPersons = [];
+  renderBlockDateChips();
+  renderBlockPersonPicker();
+  document.getElementById('block-note-input').value = '';
+  saveState(); renderSpecialBlocks();
+  showToast(`✅ เพิ่มวันพิเศษแล้ว`,'ok');
+}
+
+function removeSpecialBlock(idx) {
+  perRot[RI].specialBlocks.splice(idx,1);
+  saveState(); renderSpecialBlocks();
+}
+
+function renderSpecialBlocks() {
+  const ri=RI, rot=rotates[ri];
+  const el=document.getElementById('special-blocks-list');
+  const lbl=document.getElementById('block-rotate-label');
+  if(lbl) lbl.textContent=rot.label+' · '+rot.dateRange;
+  const bi=document.getElementById('block-date-input');
+  if(bi){
+    bi.min=rot.startStr;
+    const ed=rot.endDate;
+    bi.max=`${ed.getFullYear()}-${String(ed.getMonth()+1).padStart(2,'0')}-${String(ed.getDate()).padStart(2,'0')}`;
+  }
+  blockSelectedDates=[]; blockSelectedPersons=[];
+  renderBlockDateChips(); renderBlockPersonPicker();
+  if(!el) return;
+  const blocks=perRot[ri].specialBlocks||[];
+  if(!blocks.length){ el.innerHTML='<span style="font-size:12px;color:var(--muted)">ยังไม่มีวันพิเศษ</span>'; return; }
+  const yearColors={1:'#059669',2:'#2563eb',3:'#9333ea'};
+  el.innerHTML=blocks.map((b,i)=>{
+    const dt=new Date(b.date+'T00:00:00');
+    const ds=`${dt.getDate()} ${TH_MONTHS[dt.getMonth()+1]} ${DOW_TH[dt.getDay()]}`;
+    let who='';
+    if(b.mode==='person'||b.persons?.length>0){
+      who=(b.persons||[]).map(rid=>{ const r=getR(rid); return r?`<span style="color:${r.color};font-weight:700">${r.name}</span>`:''; }).join(' ');
+    } else {
+      who=(b.years||[]).map(y=>`<span style="color:${yearColors[y]};font-weight:700">R${y}</span>`).join(' ');
+    }
+    return `<div style="display:flex;align-items:center;gap:8px;padding:7px 12px;background:#faf5ff;border:1px solid #e9d5ff;border-radius:8px;font-size:12px;">
+      <span>🚫</span>
+      <div><div style="font-weight:600">${ds}</div><div style="font-size:11px;color:var(--muted);margin-top:1px">${who}${b.note?' · '+b.note:''}</div></div>
+      <button onclick="removeSpecialBlock(${i})" style="background:none;border:none;cursor:pointer;color:#94a3b8;font-size:16px;margin-left:4px;">×</button>
+    </div>`;
+  }).join('');
 }
 
 // ============================================================
@@ -1372,33 +1911,145 @@ let nameOverrides = {};
 
 function loadNameOverrides() {
   try {
+    // Load custom RES additions/deletions first
+    const rs = localStorage.getItem('er28_res');
+    if (rs) {
+      const saved = JSON.parse(rs);
+      // Add any new residents not in base RES
+      saved.forEach(sr => {
+        if (!RES.find(r=>r.id===sr.id)) {
+          RES.push(sr);
+        } else {
+          // Update name/color
+          const r = RES.find(x=>x.id===sr.id);
+          if (r) { r.name=sr.name; r.color=sr.color; r.bg=sr.bg; r.border=sr.border; }
+        }
+      });
+      // Remove any that were deleted (exist in RES but not in saved)
+      const savedIds = saved.map(s=>s.id);
+      for (let i=RES.length-1;i>=0;i--) {
+        if (!savedIds.includes(RES[i].id)) RES.splice(i,1);
+      }
+    }
+    // Then apply name overrides
     const s = localStorage.getItem('er28_names');
     if (s) {
       nameOverrides = JSON.parse(s);
       RES.forEach(r => { if (nameOverrides[r.id]) r.name = nameOverrides[r.id]; });
     }
-  } catch(e) {}
+  } catch(e) { console.warn('loadNameOverrides',e); }
 }
-function renderNameEditGrid() {
-  const grid = document.getElementById('name-edit-grid');
+// Color palettes for new residents
+const COLOR_PALETTES = {
+  3: [
+    {color:'#c2410c',bg:'#fff7ed',border:'#fed7aa'},{color:'#9f1239',bg:'#fff1f2',border:'#fecdd3'},
+    {color:'#92400e',bg:'#fef3c7',border:'#fde68a'},{color:'#7c2d12',bg:'#ffedd5',border:'#fdba74'},
+    {color:'#881337',bg:'#fce7f3',border:'#fbcfe8'},{color:'#713f12',bg:'#fefce8',border:'#fef08a'},
+    {color:'#991b1b',bg:'#fee2e2',border:'#fca5a5'},{color:'#86198f',bg:'#fdf4ff',border:'#f0abfc'},
+    {color:'#be123c',bg:'#fff1f2',border:'#fecdd3'},{color:'#9a3412',bg:'#fff7ed',border:'#fdba74'},
+  ],
+  2: [
+    {color:'#1e40af',bg:'#eff6ff',border:'#bfdbfe'},{color:'#0e7490',bg:'#ecfeff',border:'#a5f3fc'},
+    {color:'#1d4ed8',bg:'#dbeafe',border:'#93c5fd'},{color:'#0f766e',bg:'#f0fdfa',border:'#99f6e4'},
+    {color:'#3730a3',bg:'#eef2ff',border:'#c7d2fe'},{color:'#6b21a8',bg:'#f5f3ff',border:'#ddd6fe'},
+    {color:'#1e3a8a',bg:'#e0f2fe',border:'#7dd3fc'},{color:'#065f46',bg:'#d1fae5',border:'#6ee7b7'},
+    {color:'#0369a1',bg:'#e0f2fe',border:'#7dd3fc'},{color:'#4338ca',bg:'#eef2ff',border:'#c7d2fe'},
+  ],
+  1: [
+    {color:'#166534',bg:'#f0fdf4',border:'#bbf7d0'},{color:'#3f6212',bg:'#f7fee7',border:'#d9f99d'},
+    {color:'#14532d',bg:'#dcfce7',border:'#86efac'},{color:'#365314',bg:'#fefce8',border:'#fef08a'},
+    {color:'#1a3a1a',bg:'#f0fdf4',border:'#4ade80'},{color:'#4d7c0f',bg:'#ecfccb',border:'#bef264'},
+    {color:'#15803d',bg:'#d1fae5',border:'#34d399'},{color:'#064e3b',bg:'#ccfbf1',border:'#5eead4'},
+    {color:'#365314',bg:'#ecfccb',border:'#a3e635'},{color:'#166534',bg:'#dcfce7',border:'#6ee7b7'},
+  ]
+};
+
+function getNextResId() {
+  const maxId = Math.max(...RES.map(r => parseInt(r.id.replace('r',''))), 0);
+  return 'r' + (maxId + 1);
+}
+
+function renderResManageGrid() {
+  const grid = document.getElementById('res-manage-grid');
   if (!grid) return;
-  grid.innerHTML = RES.map(r => `
-    <div class="name-edit-row">
-      <div class="name-edit-swatch" style="background:${r.color};border:1px solid ${r.border}"></div>
-      <span class="name-edit-label">R${r.year}</span>
-      <input class="name-edit-input" id="ne-${r.id}" value="${r.name}" placeholder="${r.name}">
-    </div>`).join('');
+  const cols = {1:'#059669',2:'#2563eb',3:'#9333ea'};
+  const labels = {1:'ปี 1',2:'ปี 2',3:'ปี 3'};
+  const quotas = {1:22,2:22,3:20};
+  grid.innerHTML = [3,2,1].map(yr => {
+    const resOfYr = RES.filter(r=>r.year===yr);
+    return `<div class="res-mgmt-card">
+      <div class="res-mgmt-hd">
+        <span style="color:${cols[yr]};font-weight:700;font-size:14px">${labels[yr]}</span>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:11px;color:var(--muted)">${resOfYr.length} คน · เป้า ${quotas[yr]} เวร</span>
+          <button class="btn btn-green btn-sm" onclick="addResOfYear(${yr})" style="padding:4px 8px;font-size:11px">+ เพิ่ม</button>
+        </div>
+      </div>
+      ${resOfYr.map(r => `
+        <div class="res-item-row" id="row-${r.id}">
+          <div class="res-item-swatch" style="background:${r.color};border:1px solid ${r.border}"></div>
+          <input class="res-item-input" id="ne-${r.id}" value="${r.name}" placeholder="${r.name}" onchange="updateResName('${r.id}',this.value)">
+          <button class="res-item-del" onclick="deleteResident('${r.id}')" title="ลบ">×</button>
+        </div>`).join('')}
+    </div>`;
+  }).join('');
 }
+
+function updateResName(id, newName) {
+  const r = RES.find(x=>x.id===id);
+  if (r && newName.trim()) { r.name = newName.trim(); nameOverrides[id] = newName.trim(); }
+}
+
+function addResOfYear(yr) {
+  const resOfYr = RES.filter(r=>r.year===yr);
+  if(resOfYr.length>=9){ showToast('⚠ เพิ่มได้สูงสุด 9 คนต่อชั้นปี','err'); return; }
+  const palette = COLOR_PALETTES[yr];
+  const p = palette[resOfYr.length % palette.length];
+  const newId = getNextResId();
+  const pinNum = resOfYr.length + 1;
+  const pin = `${yr}${String(pinNum).padStart(3,'0')}`;
+  RES.push({ id:newId, name:`ปี${yr} คนที่${resOfYr.length+1}`, year:yr, pin, ...p });
+  // Add to all perRot active
+  perRot.forEach(pr => { pr.active[newId] = true; });
+  renderResManageGrid();
+  showToast(`✅ เพิ่ม Resident ปี ${yr} แล้ว`, 'ok');
+}
+
+function deleteResident(id) {
+  const r = RES.find(x=>x.id===id);
+  if (!r) return;
+  if (!confirm(`ลบ "${r.name}" ออกจากระบบ?
+ข้อมูลเวรของคนนี้จะถูกลบทั้งหมด`)) return;
+  const idx = RES.findIndex(x=>x.id===id);
+  RES.splice(idx, 1);
+  // Remove from all schedules
+  perRot.forEach(pr => {
+    delete pr.active[id];
+    Object.values(pr.sched).forEach(day => {
+      SHIFTS.forEach(s => { day[s] = (day[s]||[]).filter(x=>x!==id); });
+    });
+    pr.lvs = pr.lvs.filter(l=>l.residentId!==id);
+  });
+  renderResManageGrid();
+  renderTable(); renderFairness();
+  showToast(`🗑 ลบ ${r.name} แล้ว`, 'ok');
+}
+
+function renderNameEditGrid() { renderResManageGrid(); } // compat alias
+
 function saveResidentNames() {
+  // collect all input values
   RES.forEach(r => {
     const el = document.getElementById(`ne-${r.id}`);
     if (!el) return;
-    const newName = el.value.trim();
-    if (newName) { r.name = newName; nameOverrides[r.id] = newName; }
+    const v = el.value.trim();
+    if (v) { r.name = v; nameOverrides[r.id] = v; }
   });
   try { localStorage.setItem('er28_names', JSON.stringify(nameOverrides)); } catch(e) {}
+  // Also save RES structure
+  try { localStorage.setItem('er28_res', JSON.stringify(RES.map(r=>({id:r.id,name:r.name,year:r.year,pin:r.pin,color:r.color,bg:r.bg,border:r.border})))); } catch(e) {}
   renderTable(); renderFairness(); renderResGrid(); renderLeaveSelect();
-  showToast('✅ บันทึกชื่อแล้ว', 'ok');
+  showToast('✅ บันทึกทั้งหมดแล้ว', 'ok');
 }
 
 // ============================================================
