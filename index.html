@@ -1,0 +1,1515 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>ER Resident Scheduler — จุฬาฯ v3</title>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<style>
+:root{
+  --bg:#f0f4f8;--surface:#fff;--surface2:#f8fafc;
+  --border:#e2e8f0;--border2:#cbd5e1;
+  --text:#0f172a;--muted:#64748b;--light:#94a3b8;
+  --ok:#16a34a;--warn:#d97706;--err:#dc2626;--accent:#0ea5e9;
+  --rest:#f0fdf4;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);font-size:13px;}
+
+header{background:#0f172a;color:#fff;padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:0 2px 10px rgba(0,0,0,.3);}
+.er-mark{width:32px;height:32px;background:#ef4444;border-radius:7px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:13px;}
+.logo-text{font-size:15px;font-weight:700;}
+.logo-sub{font-size:10px;color:#64748b;font-family:'IBM Plex Mono',monospace;}
+.nav-btn{padding:6px 14px;border-radius:6px;border:1px solid transparent;background:transparent;color:#94a3b8;cursor:pointer;font-family:'Sarabun',sans-serif;font-size:13px;transition:all .12s;}
+.nav-btn:hover{background:#1e293b;color:#fff;}
+.nav-btn.active{background:#ef4444;color:#fff;}
+.save-ind{font-size:11px;color:#64748b;font-family:'IBM Plex Mono',monospace;display:flex;align-items:center;gap:5px;}
+.save-dot{width:7px;height:7px;border-radius:50%;}
+
+.container{max-width:1600px;margin:0 auto;padding:20px 24px;}
+.tab-content{display:none;}.tab-content.active{display:block;}
+
+.toolbar{background:#fff;border:1px solid var(--border);border-radius:10px;padding:12px 20px;margin-bottom:16px;display:flex;align-items:center;gap:10px;box-shadow:0 1px 3px rgba(0,0,0,.05);flex-wrap:wrap;}
+.toolbar-left{flex:1;display:flex;align-items:center;gap:12px;min-width:200px;}
+.page-title{font-size:18px;font-weight:700;}
+.page-sub{font-size:10px;color:var(--muted);font-family:'IBM Plex Mono',monospace;}
+.btn{padding:7px 15px;border-radius:7px;border:none;cursor:pointer;font-family:'Sarabun',sans-serif;font-size:13px;font-weight:600;transition:all .12s;white-space:nowrap;display:flex;align-items:center;gap:5px;}
+.btn-red{background:#ef4444;color:#fff;}.btn-red:hover{background:#dc2626;}
+.btn-blue{background:var(--accent);color:#fff;}.btn-blue:hover{background:#0284c7;}
+.btn-green{background:#22c55e;color:#fff;}.btn-green:hover{background:#16a34a;}
+.btn-outline{background:#fff;color:var(--text);border:1px solid var(--border2);}.btn-outline:hover{border-color:var(--accent);color:var(--accent);}
+.btn-amber{background:#f59e0b;color:#fff;}.btn-amber:hover{background:#d97706;}
+.btn-sm{padding:5px 10px;font-size:12px;}
+
+/* ROTATE SELECTOR */
+.rotate-bar{background:#fff;border:1px solid var(--border);border-radius:10px;padding:12px 20px;margin-bottom:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;box-shadow:0 1px 3px rgba(0,0,0,.05);}
+.rotate-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);}
+.rotate-chips{display:flex;gap:6px;flex-wrap:wrap;flex:1;}
+.rotate-chip{padding:6px 14px;border-radius:20px;border:2px solid var(--border);background:#fff;cursor:pointer;font-size:12px;font-weight:600;transition:all .12s;font-family:'IBM Plex Mono',monospace;color:var(--muted);}
+.rotate-chip:hover{border-color:var(--accent);color:var(--accent);}
+.rotate-chip.active{border-color:#ef4444;background:#fef2f2;color:#ef4444;}
+.rotate-chip .rc-dates{font-size:10px;font-weight:400;display:block;color:var(--muted);}
+.rotate-chip.active .rc-dates{color:#f87171;}
+.add-rotate-btn{padding:6px 12px;border-radius:7px;border:1px dashed var(--border2);background:transparent;cursor:pointer;font-size:12px;color:var(--muted);transition:all .12s;font-family:'Sarabun',sans-serif;}
+.add-rotate-btn:hover{border-color:var(--accent);color:var(--accent);background:#f0f9ff;}
+
+/* STATS */
+.stats-row{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin-bottom:16px;}
+.stat{background:#fff;border:1px solid var(--border);border-radius:10px;padding:10px 14px;box-shadow:0 1px 3px rgba(0,0,0,.04);}
+.stat-label{font-size:9px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:3px;}
+.stat-val{font-size:18px;font-weight:800;font-family:'IBM Plex Mono',monospace;}
+.stat-val.ok{color:var(--ok);}.stat-val.warn{color:var(--warn);}.stat-val.err{color:var(--err);}.stat-val.blue{color:var(--accent);}
+
+/* TABLE */
+.table-wrap{background:#fff;border:1px solid var(--border);border-radius:10px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.06);}
+.table-scroll{overflow-x:auto;}
+table.sched{width:100%;border-collapse:collapse;}
+table.sched thead th{background:#1e293b;color:#e2e8f0;padding:10px 8px;font-size:11px;font-weight:600;text-align:center;border-right:1px solid #334155;white-space:nowrap;}
+th.col-date{text-align:left;padding-left:14px;min-width:130px;position:sticky;left:0;z-index:11;background:#1e293b;}
+th.col-M{min-width:185px;background:#78350f;border-left:3px solid #f59e0b;}
+th.col-A{min-width:185px;background:#1e3a8a;border-left:3px solid #3b82f6;}
+th.col-N{min-width:185px;background:#3b0764;border-left:3px solid #8b5cf6;}
+
+.day-row{border-bottom:2px solid var(--border);}
+.day-row:last-child{border-bottom:none;}
+.day-row td{vertical-align:top;}
+.date-cell{padding:9px 12px;border-right:1px solid var(--border);position:sticky;left:0;background:#fff;z-index:5;min-width:130px;}
+.day-row.weekend .date-cell{background:#fff5f5;}
+.day-row.holiday-row .date-cell{background:#fff7ed;}
+.day-row.tuesday-row .date-cell{background:#fffbeb;}
+.day-row.rest-day .date-cell{background:var(--rest);}
+.day-row.weekend .shift-cell,.day-row.holiday-row .shift-cell{background:#fffdf7;}
+.day-row.rest-day .shift-cell{background:#f7fef9;}
+.date-num{font-size:13px;font-weight:800;font-family:'IBM Plex Mono',monospace;line-height:1;}
+.date-full{font-size:12px;font-weight:600;font-family:'IBM Plex Mono',monospace;}
+.date-dow{font-size:11px;color:var(--muted);margin-top:2px;}
+.date-dow.we{color:#dc2626;font-weight:700;}
+.date-dow.tue{color:#b45309;font-weight:600;}
+.date-tags{margin-top:4px;display:flex;flex-direction:column;gap:2px;}
+.dtag{font-size:9px;padding:1px 5px;border-radius:3px;display:inline-block;width:fit-content;}
+.dtag-hol{background:#ffedd5;color:#c2410c;font-weight:700;}
+.dtag-tue{background:#fef3c7;color:#92400e;}
+.dtag-rest{background:#dcfce7;color:#166534;}
+
+.shift-cell{padding:7px 9px;border-right:1px solid var(--border);vertical-align:top;min-width:185px;}
+.shift-cell:last-child{border-right:none;}
+.names-list{display:flex;flex-direction:column;gap:3px;min-height:24px;}
+.add-slot{display:flex;align-items:center;gap:4px;padding:3px 8px;border-radius:5px;font-size:11px;color:var(--light);cursor:pointer;border:1px dashed var(--border2);transition:all .1s;margin-top:3px;width:fit-content;}
+.add-slot:hover{border-color:var(--accent);color:var(--accent);background:#f0f9ff;}
+.shift-footer{display:flex;align-items:center;gap:3px;flex-wrap:wrap;margin-top:4px;padding-top:4px;border-top:1px solid var(--border);}
+.cnt-badge{font-size:10px;font-family:'IBM Plex Mono',monospace;font-weight:600;padding:1px 6px;border-radius:4px;}
+.cnt-ok{background:#dcfce7;color:var(--ok);}.cnt-warn{background:#fef9c3;color:var(--warn);}.cnt-err{background:#fee2e2;color:var(--err);}
+.flag{font-size:9px;padding:1px 4px;border-radius:3px;}
+.flag-err{background:#fee2e2;color:var(--err);}.flag-warn{background:#fef9c3;color:var(--warn);}
+.flag-purple{background:#f3e8ff;color:#9333ea;}.flag-green{background:#dcfce7;color:#166534;}
+
+.legend-bar{display:flex;gap:12px;padding:8px 16px;border-top:1px solid var(--border);background:var(--surface2);font-size:11px;flex-wrap:wrap;align-items:center;}
+.legend-item{display:flex;align-items:center;gap:5px;color:var(--muted);}
+.legend-dot{width:8px;height:8px;border-radius:2px;}
+
+/* FAIRNESS */
+.fairness-wrap{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;}
+.fc{background:#fff;border:1px solid var(--border);border-radius:10px;overflow:hidden;}
+.fc-hd{padding:10px 14px;border-bottom:1px solid var(--border);font-weight:700;font-size:12px;}
+.fc-body{padding:10px 14px;max-height:300px;overflow-y:auto;}
+.fc-row{display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--border);font-size:11px;}
+.fc-row:last-child{border-bottom:none;}
+.fc-name{min-width:100px;font-weight:600;font-size:12px;}
+.mini-bars{display:flex;gap:3px;flex:1;}
+.mbar-wrap{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;}
+.mbar-label{font-size:9px;color:var(--muted);}
+.mbar-bg{width:100%;background:#f1f5f9;border-radius:2px;height:8px;overflow:hidden;}
+.mbar-fill{height:8px;border-radius:2px;transition:width .3s;}
+.fc-nums{display:flex;gap:3px;font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:600;}
+.hsp-row{display:flex;align-items:center;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);font-size:11px;}
+.hsp-row:last-child{border-bottom:none;}
+.hsp-bw{width:80px;background:#f1f5f9;border-radius:3px;height:5px;overflow:hidden;margin:0 8px;}
+.hsp-bf{height:5px;border-radius:3px;}
+.hsp-num{font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:11px;min-width:18px;text-align:right;}
+
+/* MODAL */
+.overlay{display:none;position:fixed;inset:0;background:rgba(15,23,42,.55);backdrop-filter:blur(4px);z-index:200;align-items:center;justify-content:center;}
+.overlay.open{display:flex;}
+.modal{background:#fff;border-radius:14px;padding:24px;width:460px;max-height:88vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.25);}
+.modal h3{font-size:16px;font-weight:700;margin-bottom:4px;}
+.modal-sub{font-size:12px;color:var(--muted);margin-bottom:14px;}
+.info-box{padding:10px 12px;border-radius:8px;font-size:12px;margin-bottom:10px;}
+.info-box.yellow{background:#fffbeb;border:1px solid #fde68a;color:#92400e;}
+.info-box.purple{background:#faf5ff;border:1px solid #e9d5ff;color:#581c87;}
+.info-box.orange{background:#fff7ed;border:1px solid #fed7aa;color:#c2410c;}
+.picker-list{display:flex;flex-direction:column;gap:4px;max-height:320px;overflow-y:auto;}
+.pick-item{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-radius:8px;border:1px solid var(--border);cursor:pointer;transition:all .1s;}
+.pick-item:hover{border-color:var(--accent);background:#f0f9ff;}
+.pick-item.selected{border-color:#16a34a;background:#f0fdf4;}
+.pick-item.unavail{opacity:.4;pointer-events:none;background:var(--surface2);}
+.pick-name{font-weight:600;font-size:13px;}
+.pick-meta{font-size:11px;color:var(--muted);margin-top:1px;}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;}
+
+/* ADD ROTATE MODAL */
+.add-rotate-modal{width:380px;}
+.form-group{margin-bottom:14px;}
+.form-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);display:block;margin-bottom:5px;}
+.form-ctrl{width:100%;padding:8px 12px;border:1px solid var(--border2);border-radius:7px;font-family:'Sarabun',sans-serif;font-size:13px;background:var(--surface2);}
+.form-ctrl:focus{outline:none;border-color:var(--accent);background:#fff;}
+
+/* HOLIDAY */
+.hol-editor{background:#fff;border:1px solid var(--border);border-radius:10px;padding:18px;margin-bottom:16px;}
+.hol-chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;}
+.hol-chip{display:flex;align-items:center;gap:6px;padding:5px 10px;background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;font-size:12px;font-weight:600;color:#c2410c;}
+.hol-rm{background:none;border:none;cursor:pointer;color:#f97316;font-size:14px;padding:0 2px;}
+.hol-rm:hover{color:#dc2626;}
+.hol-add-row{display:flex;gap:8px;align-items:center;}
+
+/* RESIDENTS */
+.res-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
+.yr-card{background:#fff;border:1px solid var(--border);border-radius:10px;overflow:hidden;}
+.yr-card-hd{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;}
+.res-row{padding:10px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.res-row:last-child{border-bottom:none;}
+.toggle{width:34px;height:18px;background:#e2e8f0;border-radius:9px;cursor:pointer;position:relative;transition:background .2s;flex-shrink:0;}
+.toggle.on{background:#22c55e;}
+.toggle::after{content:'';position:absolute;width:14px;height:14px;border-radius:50%;background:#fff;top:2px;left:2px;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.2);}
+.toggle.on::after{left:18px;}
+
+/* LEAVES */
+.lv-grid{display:grid;grid-template-columns:380px 1fr;gap:20px;}
+.lv-form{background:#fff;border:1px solid var(--border);border-radius:10px;padding:20px;}
+.lv-list-wrap{background:#fff;border:1px solid var(--border);border-radius:10px;overflow:hidden;}
+.lv-list-hd{padding:12px 16px;border-bottom:1px solid var(--border);font-weight:600;display:flex;justify-content:space-between;align-items:center;}
+.lv-entry{padding:11px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.lv-entry:last-child{border-bottom:none;}
+.lv-badge{font-size:10px;padding:2px 7px;border-radius:4px;font-weight:600;}
+.lv-LEAVE{background:#fee2e2;color:#dc2626;}.lv-AWAY{background:#f1f5f9;color:#475569;}
+.del-btn{background:none;border:none;color:var(--light);cursor:pointer;font-size:16px;padding:2px 6px;border-radius:4px;}
+.del-btn:hover{background:#fee2e2;color:#dc2626;}
+
+/* RESIDENT VIEW */
+.res-view{max-width:600px;margin:0 auto;}
+.quota-row{display:flex;gap:16px;background:#fff;border:1px solid var(--border);border-radius:10px;padding:16px 20px;margin-bottom:20px;}
+.q-item{text-align:center;}
+.q-num{font-size:26px;font-weight:800;font-family:'IBM Plex Mono',monospace;}
+.q-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;}
+.my-sched-list{background:#fff;border:1px solid var(--border);border-radius:10px;overflow:hidden;}
+.my-sched-row{padding:10px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;font-size:13px;}
+.my-sched-row:last-child{border-bottom:none;}
+.stag{font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;font-family:'IBM Plex Mono',monospace;}
+.stag-M{background:#fef3c7;color:#b45309;border:1px solid #fde68a;}
+.stag-A{background:#dbeafe;color:#1d4ed8;border:1px solid #bfdbfe;}
+.stag-N{background:#ede9fe;color:#6d28d9;border:1px solid #ddd6fe;}
+
+.toast{position:fixed;bottom:24px;right:24px;background:#1e293b;color:#fff;padding:11px 18px;border-radius:8px;font-size:13px;z-index:300;transform:translateY(50px);opacity:0;transition:all .22s;box-shadow:0 4px 16px rgba(0,0,0,.2);}
+.toast.show{transform:translateY(0);opacity:1;}
+.toast.ok{border-left:3px solid #22c55e;}.toast.err{border-left:3px solid #ef4444;}
+@keyframes slideUp{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
+
+/* SETTINGS */
+.name-edit-row{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;}
+.name-edit-swatch{width:12px;height:12px;border-radius:3px;flex-shrink:0;}
+.name-edit-label{font-size:11px;color:var(--muted);min-width:30px;font-family:'IBM Plex Mono',monospace;}
+.name-edit-input{flex:1;padding:5px 8px;border:1px solid var(--border2);border-radius:6px;font-family:'Sarabun',sans-serif;font-size:13px;background:#fff;}
+.name-edit-input:focus{outline:none;border-color:var(--accent);}
+.email-chip{display:flex;align-items:center;gap:6px;padding:5px 10px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:20px;font-size:12px;font-weight:600;color:#1e40af;cursor:pointer;transition:all .1s;}
+.email-chip:hover{background:#dbeafe;}
+.email-chip-rm{background:none;border:none;cursor:pointer;color:#93c5fd;font-size:13px;padding:0 2px;line-height:1;}
+.email-chip-rm:hover{color:#dc2626;}
+.capture-overlay{position:fixed;top:0;left:0;background:rgba(15,23,42,.7);color:#fff;font-size:14px;font-weight:600;z-index:999;display:flex;align-items:center;justify-content:center;gap:12px;}
+</style>
+</head>
+<body>
+
+
+<header>
+  <div style="display:flex;align-items:center;gap:12px">
+    <div class="er-mark">ER</div>
+    <div><div class="logo-text">Resident Scheduler</div><div class="logo-sub">KING CHULALONGKORN MEMORIAL HOSPITAL · 28-DAY ROTATE · v3</div></div>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <div class="save-ind" id="save-ind"><div class="save-dot" style="background:#22c55e"></div><span>บันทึกแล้ว</span></div>
+    <div style="display:flex;gap:5px">
+      <button class="nav-btn active" onclick="switchTab('schedule',this)">📅 ตาราง</button>
+      <button class="nav-btn" onclick="switchTab('fairness',this)">⚖️ Fairness</button>
+      <button class="nav-btn" onclick="switchTab('holidays',this)">🎌 วันหยุด</button>
+      <button class="nav-btn" onclick="switchTab('residents',this)">👨‍⚕️ Residents</button>
+      <button class="nav-btn" onclick="switchTab('leaves',this)">📋 ขอลา</button>
+      <button class="nav-btn" onclick="switchTab('settings',this)">⚙️ ตั้งค่า</button>
+    </div>
+  </div>
+</header>
+
+<div class="container">
+
+<!-- SCHEDULE -->
+<div id="tab-schedule" class="tab-content active">
+  <div class="toolbar">
+    <div class="toolbar-left">
+      <div><div class="page-title" id="rot-title">รอบที่ 1</div><div class="page-sub" id="rot-sub">28 DAYS</div></div>
+    </div>
+    <button class="btn btn-red" onclick="autoSchedule()">⚡ Auto-จัด</button>
+    <button class="btn btn-outline" onclick="clearSchedule()">🗑 ล้าง</button>
+    <button class="btn btn-green" onclick="exportXLSX()">📊 Export .xlsx</button>
+    <button class="btn btn-blue" onclick="exportCSV()">↓ CSV</button>
+  </div>
+
+  <!-- ROTATE SELECTOR -->
+  <div class="rotate-bar">
+    <span class="rotate-label">รอบ</span>
+    <div class="rotate-chips" id="rotate-chips"></div>
+    <button class="add-rotate-btn" onclick="openAddRotate()">＋ เพิ่มรอบ</button>
+  </div>
+
+  <div class="stats-row" id="stats-row"></div>
+  <div class="table-wrap">
+    <div class="table-scroll">
+      <table class="sched">
+        <thead><tr>
+          <th class="col-date">วันที่</th>
+          <th class="col-M">☀ เช้า 08:00–16:00</th>
+          <th class="col-A">🌆 บ่าย 16:00–24:00</th>
+          <th class="col-N">🌙 ดึก 00:00–08:00</th>
+        </tr></thead>
+        <tbody id="sched-body"></tbody>
+      </table>
+    </div>
+    <div class="legend-bar">
+      <span style="font-size:10px;font-weight:700;color:var(--muted)">LEGEND</span>
+      <div class="legend-item"><div class="legend-dot" style="background:#f59e0b"></div>วันหยุด 🌟</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#22c55e"></div>💤 พักหลังดึก</div>
+      <div class="legend-item" style="color:#b45309;font-weight:600">⚠ อังคาร: เช้าสูงสุด 3</div>
+    </div>
+  </div>
+</div>
+
+<!-- FAIRNESS -->
+<div id="tab-fairness" class="tab-content">
+  <div class="toolbar" style="margin-bottom:16px">
+    <div class="toolbar-left"><div class="page-title">⚖️ Fairness Dashboard</div></div>
+    <span style="font-size:12px;color:var(--muted)">รอบปัจจุบัน: <span id="fair-rot-label" style="font-weight:700;color:var(--text)">-</span></span>
+  </div>
+  <div class="fairness-wrap">
+    <div class="fc"><div class="fc-hd">📊 M / A / N ต่อคน</div><div class="fc-body" id="fairness-body"></div></div>
+    <div class="fc"><div class="fc-hd">🌟 เวรวันหยุดต่อคน</div><div class="fc-body" id="hol-stats-body"></div></div>
+  </div>
+</div>
+
+<!-- HOLIDAYS -->
+<div id="tab-holidays" class="tab-content">
+  <div class="toolbar" style="margin-bottom:16px">
+    <div class="toolbar-left"><div class="page-title">วันหยุดนักขัตฤกษ์</div></div>
+    <span style="font-size:12px;color:var(--muted)">รอบ: <span id="hol-rot-label" style="font-weight:700;color:var(--text)">-</span></span>
+  </div>
+  <div class="hol-editor">
+    <div class="hol-chips" id="hol-chips"></div>
+    <div class="hol-add-row">
+      <input type="date" class="form-ctrl" id="hol-date-input" style="width:160px">
+      <input type="text" class="form-ctrl" id="hol-name-input" placeholder="ชื่อวันหยุด เช่น วันอาสาฬหบูชา" style="flex:1">
+      <button class="btn btn-red" onclick="addHoliday()">+ เพิ่ม</button>
+    </div>
+  </div>
+</div>
+
+<!-- RESIDENTS -->
+<div id="tab-residents" class="tab-content">
+  <div class="toolbar" style="margin-bottom:16px">
+    <div class="toolbar-left"><div class="page-title">Residents — รอบ <span id="res-rot-label">-</span></div></div>
+    <span style="font-size:12px;color:var(--muted)">Toggle ON/OFF สำหรับรอบนี้เท่านั้น (บันทึกแยกต่างหากแต่ละรอบ)</span>
+  </div>
+  <div class="res-grid" id="res-grid"></div>
+</div>
+
+<!-- LEAVES -->
+<div id="tab-leaves" class="tab-content">
+  <div class="toolbar" style="margin-bottom:16px">
+    <div class="toolbar-left"><div class="page-title">คำขอลา — รอบ <span id="lv-rot-label">-</span></div></div>
+  </div>
+  <div class="lv-grid">
+    <div class="lv-form">
+      <h3 style="font-size:15px;font-weight:700;margin-bottom:16px">เพิ่มคำขอ</h3>
+      <div class="form-group"><label class="form-label">Resident</label><select class="form-ctrl" id="lv-res" onchange="updateQuotaDisplay()"></select></div>
+      <div class="form-group"><label class="form-label">วันที่</label><input type="date" class="form-ctrl" id="lv-date"></div>
+      <div class="form-group"><label class="form-label">ประเภท</label>
+        <select class="form-ctrl" id="lv-type">
+          <option value="LEAVE">🔴 ลาพักร้อน (สิทธิ์ 4 วัน/รอบ)</option>
+          <option value="AWAY">⬛ งานอื่น / ติว / ธุระ</option>
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">หมายเหตุ</label><input type="text" class="form-ctrl" id="lv-note" placeholder="เช่น ติวบอร์ด..."></div>
+      <div id="quota-display" style="font-size:12px;color:var(--muted);margin-bottom:12px;padding:8px 12px;background:var(--surface2);border-radius:7px;border:1px solid var(--border)"></div>
+      <button class="btn btn-red" style="width:100%" onclick="addLeave()">+ เพิ่มคำขอ</button>
+    </div>
+    <div class="lv-list-wrap">
+      <div class="lv-list-hd">รายการขอลา <span id="lv-cnt" style="background:#fee2e2;color:#dc2626;font-size:11px;padding:2px 9px;border-radius:10px;font-family:monospace">0</span></div>
+      <div id="lv-entries"></div>
+    </div>
+  </div>
+</div>
+
+<!-- SETTINGS -->
+<div id="tab-settings" class="tab-content">
+  <div class="toolbar" style="margin-bottom:16px">
+    <div class="toolbar-left"><div class="page-title">⚙️ ตั้งค่าระบบ</div></div>
+  </div>
+
+  <!-- EDIT RESIDENT NAMES -->
+  <div style="background:#fff;border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:20px;">
+    <div style="padding:14px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+      <div style="font-weight:700;font-size:14px">✏️ แก้ไขชื่อ Resident</div>
+      <button class="btn btn-green btn-sm" onclick="saveResidentNames()">💾 บันทึกชื่อ</button>
+    </div>
+    <div style="padding:16px 20px;">
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px" id="name-edit-grid"></div>
+    </div>
+  </div>
+
+  <!-- EXPORT & EMAIL -->
+  <div style="background:#fff;border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:20px;">
+    <div style="padding:14px 20px;border-bottom:1px solid var(--border);font-weight:700;font-size:14px">📤 Export & ส่งอีเมล</div>
+    <div style="padding:20px;display:flex;flex-direction:column;gap:16px;">
+
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px;text-align:center;">
+          <div style="font-size:28px;margin-bottom:8px">📊</div>
+          <div style="font-weight:700;font-size:14px;margin-bottom:4px">Excel (.xlsx)</div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:12px">3 sheets: ตาราง, สรุป, Calendar</div>
+          <button class="btn btn-green" style="width:100%" onclick="exportXLSX()">↓ Download .xlsx</button>
+        </div>
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px;text-align:center;">
+          <div style="font-size:28px;margin-bottom:8px">🖼️</div>
+          <div style="font-weight:700;font-size:14px;margin-bottom:4px">ภาพ (.jpeg)</div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:12px">Screenshot ตารางเวรรอบปัจจุบัน</div>
+          <button class="btn btn-blue" style="width:100%" onclick="exportJPEG()">↓ Download .jpeg</button>
+        </div>
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px;text-align:center;">
+          <div style="font-size:28px;margin-bottom:8px">✉️</div>
+          <div style="font-weight:700;font-size:14px;margin-bottom:4px">ส่งอีเมล</div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:12px">แนบ Excel หรือ ภาพ</div>
+          <button class="btn btn-amber" style="width:100%" onclick="openEmailModal()">📨 ส่งอีเมล...</button>
+        </div>
+      </div>
+
+      <!-- Quick email recipients -->
+      <div>
+        <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">อีเมลที่บันทึกไว้</div>
+        <div id="saved-emails-list" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px"></div>
+        <div style="display:flex;gap:8px;">
+          <input type="email" class="form-ctrl" id="new-email-input" placeholder="เพิ่มอีเมลใหม่ เช่น er@chula.ac.th" style="flex:1">
+          <input type="text" class="form-ctrl" id="new-email-label" placeholder="ชื่อ เช่น หัวหน้า ER" style="width:160px">
+          <button class="btn btn-outline" onclick="saveEmail()">+ บันทึก</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DANGER ZONE -->
+  <div style="background:#fff;border:1px solid #fecaca;border-radius:10px;overflow:hidden;">
+    <div style="padding:14px 20px;border-bottom:1px solid #fecaca;font-weight:700;font-size:14px;color:#dc2626">⚠️ Danger Zone</div>
+    <div style="padding:16px 20px;display:flex;gap:12px;align-items:center;">
+      <button class="btn btn-outline" style="border-color:#fca5a5;color:#dc2626" onclick="clearAllData()">🗑 ล้างข้อมูลทั้งหมด (reset)</button>
+      <span style="font-size:12px;color:var(--muted)">ลบตาราง, คำขอลา, และรอบทั้งหมด กลับเป็นค่าเริ่มต้น</span>
+    </div>
+  </div>
+</div>
+
+</div><!-- /container -->
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <h3 id="modal-h"></h3><div class="modal-sub" id="modal-sub"></div>
+    <div id="modal-infos"></div>
+    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px">เลือก Resident</div>
+    <div class="picker-list" id="modal-picker"></div>
+    <div class="modal-actions"><button class="btn btn-outline" onclick="closeModal()">ปิด</button></div>
+  </div>
+</div>
+
+<!-- ADD ROTATE MODAL -->
+<div class="overlay" id="add-rot-overlay">
+  <div class="modal add-rotate-modal">
+    <h3>เพิ่มรอบ Rotate ใหม่</h3>
+    <div class="modal-sub" id="add-rot-sub">รอบถัดไปจะเริ่มต้น...</div>
+    <div class="form-group" style="margin-top:16px">
+      <label class="form-label">วันเริ่มต้นรอบ</label>
+      <input type="date" class="form-ctrl" id="new-rot-start">
+    </div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:16px" id="new-rot-preview"></div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeAddRotate()">ยกเลิก</button>
+      <button class="btn btn-red" onclick="confirmAddRotate()">+ เพิ่มรอบ</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- EMAIL MODAL -->
+<div class="overlay" id="email-overlay">
+  <div class="modal" style="width:480px">
+    <h3>📨 ส่งอีเมล</h3>
+    <div class="modal-sub">รอบปัจจุบัน: <span id="email-rot-label"></span></div>
+    <div class="form-group">
+      <label class="form-label">ถึง (To)</label>
+      <input type="email" class="form-ctrl" id="email-to" placeholder="email@example.com">
+      <div id="email-quick-btns" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px"></div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">CC (ถ้ามี)</label>
+      <input type="email" class="form-ctrl" id="email-cc" placeholder="cc@example.com (optional)">
+    </div>
+    <div class="form-group">
+      <label class="form-label">หัวเรื่อง</label>
+      <input type="text" class="form-ctrl" id="email-subject">
+    </div>
+    <div class="form-group">
+      <label class="form-label">ข้อความ</label>
+      <textarea class="form-ctrl" id="email-body" rows="4" style="resize:vertical"></textarea>
+    </div>
+    <div class="form-group">
+      <label class="form-label">แนบไฟล์</label>
+      <div style="display:flex;gap:8px;">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;">
+          <input type="checkbox" id="attach-xlsx" checked> 📊 Excel (.xlsx)
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;">
+          <input type="checkbox" id="attach-jpeg"> 🖼️ ภาพตาราง (.jpeg)
+        </label>
+      </div>
+    </div>
+    <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px 12px;font-size:12px;color:#92400e;margin-bottom:14px">
+      💡 ระบบจะเปิด Gmail / Mail app พร้อมข้อความ และ download ไฟล์แนบให้ก่อน (เนื่องจาก browser ไม่อนุญาตแนบไฟล์อัตโนมัติ)
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeEmailModal()">ยกเลิก</button>
+      <button class="btn btn-amber" onclick="sendEmail()">📨 เปิด Mail App</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// CORE: 28-day rotate periods
+// ============================================================
+const ROTATE_DAYS = 28;
+const QUOTA = {1:22, 2:22, 3:20};
+const SHIFTS = ['M','A','N'];
+const SNAME = {M:'เช้า',A:'บ่าย',N:'ดึก'};
+const STIME = {M:'08:00–16:00',A:'16:00–24:00',N:'00:00–08:00'};
+const DOW_TH = ['อา','จ','อ','พ','พฤ','ศ','ส'];
+const DOW_FULL = ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'];
+const TH_MONTHS = ['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+const TH_MONTHS_FULL = ['','มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+
+// Generate rotate periods starting from a date
+// Each period: startDate, endDate (28 days)
+function makeRotate(startDateStr, idx) {
+  const start = new Date(startDateStr + 'T00:00:00');
+  const end = new Date(start);
+  end.setDate(end.getDate() + ROTATE_DAYS - 1);
+  const fmt = d => `${d.getDate()} ${TH_MONTHS[d.getMonth()+1]} ${d.getFullYear()+543}`;
+  return {
+    idx,
+    startStr: startDateStr,
+    label: `รอบ ${idx+1}`,
+    dateRange: `${fmt(start)} – ${fmt(end)}`,
+    startDate: start,
+    endDate: end,
+  };
+}
+
+// ============================================================
+// RESIDENT DATA
+// ============================================================
+const RES = [
+  {id:'r1',  name:'ก่อกฤษฎิ์',    year:3, pin:'3001', color:'#c2410c', bg:'#fff7ed', border:'#fed7aa'},
+  {id:'r2',  name:'ชนากานต์',     year:3, pin:'3002', color:'#9f1239', bg:'#fff1f2', border:'#fecdd3'},
+  {id:'r3',  name:'ณัฐนนท์',     year:3, pin:'3003', color:'#92400e', bg:'#fef3c7', border:'#fde68a'},
+  {id:'r4',  name:'นภัทร',       year:3, pin:'3004', color:'#7c2d12', bg:'#ffedd5', border:'#fdba74'},
+  {id:'r5',  name:'ประภาศิริ',    year:3, pin:'3005', color:'#881337', bg:'#fce7f3', border:'#fbcfe8'},
+  {id:'r6',  name:'วิทยา',       year:3, pin:'3006', color:'#713f12', bg:'#fefce8', border:'#fef08a'},
+  {id:'r7',  name:'ศุภวิชญ์',    year:3, pin:'3007', color:'#991b1b', bg:'#fee2e2', border:'#fca5a5'},
+  {id:'r8',  name:'สวิตต์',      year:3, pin:'3008', color:'#86198f', bg:'#fdf4ff', border:'#f0abfc'},
+  {id:'r9',  name:'ชานน',        year:2, pin:'2001', color:'#1e40af', bg:'#eff6ff', border:'#bfdbfe'},
+  {id:'r10', name:'ญาดา',        year:2, pin:'2002', color:'#0e7490', bg:'#ecfeff', border:'#a5f3fc'},
+  {id:'r11', name:'เตชินท์',     year:2, pin:'2003', color:'#1d4ed8', bg:'#dbeafe', border:'#93c5fd'},
+  {id:'r12', name:'เปรมสุพัฒนี', year:2, pin:'2004', color:'#0f766e', bg:'#f0fdfa', border:'#99f6e4'},
+  {id:'r13', name:'พิชชาพร',     year:2, pin:'2005', color:'#3730a3', bg:'#eef2ff', border:'#c7d2fe'},
+  {id:'r14', name:'แพรวา',       year:2, pin:'2006', color:'#6b21a8', bg:'#f5f3ff', border:'#ddd6fe'},
+  {id:'r15', name:'มณิภา',       year:2, pin:'2007', color:'#1e3a8a', bg:'#e0f2fe', border:'#7dd3fc'},
+  {id:'r16', name:'ลภน',         year:2, pin:'2008', color:'#065f46', bg:'#d1fae5', border:'#6ee7b7'},
+  {id:'r17', name:'ชานูซี',      year:1, pin:'1001', color:'#166534', bg:'#f0fdf4', border:'#bbf7d0'},
+  {id:'r18', name:'ธนกฤติ',      year:1, pin:'1002', color:'#3f6212', bg:'#f7fee7', border:'#d9f99d'},
+  {id:'r19', name:'ปวรสุข',      year:1, pin:'1003', color:'#14532d', bg:'#dcfce7', border:'#86efac'},
+  {id:'r20', name:'หฤษฎ์',       year:1, pin:'1004', color:'#365314', bg:'#fefce8', border:'#fef08a'},
+  {id:'r21', name:'ศิรวิชญ์',    year:1, pin:'1005', color:'#1a3a1a', bg:'#f0fdf4', border:'#4ade80'},
+  {id:'r22', name:'ปัทมพร',      year:1, pin:'1006', color:'#4d7c0f', bg:'#ecfccb', border:'#bef264'},
+  {id:'r23', name:'พรปัญญา',     year:1, pin:'1007', color:'#15803d', bg:'#d1fae5', border:'#34d399'},
+  {id:'r24', name:'นีรนารา',     year:1, pin:'1008', color:'#064e3b', bg:'#ccfbf1', border:'#5eead4'},
+  {id:'r25', name:'นิชาภา',       year:1, pin:'1009', color:'#365314', bg:'#ecfccb', border:'#a3e635'},
+];
+
+// ============================================================
+// STATE — indexed by rotate period index (ri)
+// ============================================================
+// rotates: [{idx, startStr, label, dateRange, startDate, endDate}]
+// perRot[ri].active = {rid: bool}
+// perRot[ri].sched[day1..28] = {M:[],A:[],N:[]}  (day is 1-28)
+// perRot[ri].lvs = [{residentId, date:'YYYY-MM-DD', type, note}]
+// perRot[ri].holidays = [{date:'YYYY-MM-DD', name}]
+
+let rotates = [];
+let perRot = [];
+let RI = 0; // current rotate index
+
+// Helpers to get actual calendar date from rotate day index
+function rotDay(ri, d) {
+  // d = 1..28, returns Date object
+  const r = rotates[ri];
+  const dt = new Date(r.startDate);
+  dt.setDate(dt.getDate() + d - 1);
+  return dt;
+}
+function rotDayStr(ri, d) {
+  const dt = rotDay(ri, d);
+  return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+}
+function dowOfDay(ri, d) { return rotDay(ri, d).getDay(); }
+const isTue = (ri, d) => dowOfDay(ri, d) === 2;
+const isWeekend = (ri, d) => { const w=dowOfDay(ri,d); return w===0||w===6; };
+const isHoliday = (ri, d) => {
+  const ds = rotDayStr(ri, d);
+  return perRot[ri].holidays.some(h => h.date === ds);
+};
+const isSpecialDay = (ri, d) => isWeekend(ri,d) || isHoliday(ri,d);
+const holName = (ri, d) => { const ds=rotDayStr(ri,d); const h=perRot[ri].holidays.find(x=>x.date===ds); return h?h.name:null; };
+function displayName(r) { return `R${r.year} ${r.name}`; }
+const getR = id => RES.find(r=>r.id===id);
+function activeRes(ri) { return RES.filter(r => perRot[ri].active[r.id] !== false); }
+
+function formatDate(dt) {
+  return `${dt.getDate()} ${TH_MONTHS[dt.getMonth()+1]} ${dt.getFullYear()+543}`;
+}
+
+// ============================================================
+// INIT ROTATE
+// ============================================================
+function createRotate(startStr) {
+  const ri = rotates.length;
+  rotates.push(makeRotate(startStr, ri));
+  perRot.push({
+    active: Object.fromEntries(RES.map(r=>[r.id, true])),
+    sched: Object.fromEntries(Array.from({length:ROTATE_DAYS},(_,i)=>[i+1,{M:[],A:[],N:[]}])),
+    lvs: [],
+    holidays: [],
+  });
+  return ri;
+}
+
+function nextRotateStart(ri) {
+  const end = rotates[ri].endDate;
+  const next = new Date(end);
+  next.setDate(next.getDate() + 1);
+  return `${next.getFullYear()}-${String(next.getMonth()+1).padStart(2,'0')}-${String(next.getDate()).padStart(2,'0')}`;
+}
+
+// ============================================================
+// PERSISTENCE
+// ============================================================
+function saveState() {
+  try {
+    localStorage.setItem('er28_rotates', JSON.stringify(rotates.map(r=>r.startStr)));
+    localStorage.setItem('er28_perRot', JSON.stringify(perRot));
+    setSaveInd(true);
+  } catch(e) { console.warn('save failed',e); }
+}
+function loadState() {
+  try {
+    const rs = localStorage.getItem('er28_rotates');
+    const pr = localStorage.getItem('er28_perRot');
+    if (rs && pr) {
+      const startStrs = JSON.parse(rs);
+      rotates = [];
+      startStrs.forEach((s,i) => rotates.push(makeRotate(s,i)));
+      perRot = JSON.parse(pr);
+      // Ensure dates are proper
+      rotates.forEach((r,i) => {
+        r.startDate = new Date(r.startStr+'T00:00:00');
+        r.endDate = new Date(r.startDate);
+        r.endDate.setDate(r.endDate.getDate()+ROTATE_DAYS-1);
+      });
+      return true;
+    }
+  } catch(e) { console.warn('load failed',e); }
+  return false;
+}
+function setSaveInd(ok) {
+  document.getElementById('save-ind').innerHTML = ok
+    ? '<div class="save-dot" style="background:#22c55e"></div><span>บันทึกแล้ว</span>'
+    : '<div class="save-dot" style="background:#f59e0b"></div><span>กำลังบันทึก...</span>';
+}
+
+// ============================================================
+// HELPERS
+// ============================================================
+function isUnavail(rid,ri,d) {
+  const ds = rotDayStr(ri,d);
+  return perRot[ri].lvs.some(l=>l.residentId===rid&&l.date===ds);
+}
+function lvTypeOf(rid,ri,d) {
+  const ds=rotDayStr(ri,d);
+  const l=perRot[ri].lvs.find(l=>l.residentId===rid&&l.date===ds);
+  return l?l.type:null;
+}
+function shiftCntByType(rid,ri) {
+  let M=0,A=0,N=0;
+  for(let d=1;d<=ROTATE_DAYS;d++){
+    if((perRot[ri].sched[d]?.M||[]).includes(rid)) M++;
+    if((perRot[ri].sched[d]?.A||[]).includes(rid)) A++;
+    if((perRot[ri].sched[d]?.N||[]).includes(rid)) N++;
+  }
+  return {M,A,N,total:M+A+N};
+}
+function shiftCnt(rid,ri){ return shiftCntByType(rid,ri).total; }
+function holShiftCnt(rid,ri) {
+  let c=0;
+  for(let d=1;d<=ROTATE_DAYS;d++){
+    if(!isSpecialDay(ri,d)) continue;
+    SHIFTS.forEach(s=>{ if((perRot[ri].sched[d]?.[s]||[]).includes(rid)) c++; });
+  }
+  return c;
+}
+function prevShiftOf(rid,ri,d) {
+  if(d<=1) return null;
+  for(const s of SHIFTS) if((perRot[ri].sched[d-1]?.[s]||[]).includes(rid)) return s;
+  return null;
+}
+function violatesHard(rid,ri,d,shift) {
+  const p=prevShiftOf(rid,ri,d);
+  if(shift==='N'&&p==='A') return true;
+  if(shift==='M'&&p==='N') return true;
+  return false;
+}
+function softPenalty(rid,ri,d,shift) {
+  let p=0;
+  const prev=prevShiftOf(rid,ri,d);
+  if(prev==='N') p+=10;
+  if(shift==='A'&&prev==='N') p+=8;
+  return p;
+}
+function alreadyToday(rid,ri,d){ return SHIFTS.some(s=>(perRot[ri].sched[d]?.[s]||[]).includes(rid)); }
+function hadNightYesterday(rid,ri,d){ if(d<=1) return false; return (perRot[ri].sched[d-1]?.N||[]).includes(rid); }
+function seniorOk(rids,shift) {
+  const y3=rids.filter(id=>getR(id)?.year===3).length;
+  const y2=rids.filter(id=>getR(id)?.year===2).length;
+  return shift==='N'? y3>=1||y2>=1 : y3>=1||y2>=2;
+}
+function typeImbalance(rid,ri,shift,typeCnt) {
+  const c=typeCnt[rid]||{M:0,A:0,N:0};
+  const tot=c.M+c.A+c.N;
+  if(tot===0) return 0;
+  return c[shift]-(tot/3);
+}
+
+// ============================================================
+// AUTO SCHEDULE
+// ============================================================
+function autoSchedule() {
+  const ri=RI;
+  for(let d=1;d<=ROTATE_DAYS;d++) perRot[ri].sched[d]={M:[],A:[],N:[]};
+
+  const ar=activeRes(ri);
+  const rem={};
+  ar.forEach(r=>rem[r.id]=QUOTA[r.year]);
+  const typeCnt={};
+  ar.forEach(r=>typeCnt[r.id]={M:0,A:0,N:0});
+  const holCnt={};
+  ar.forEach(r=>holCnt[r.id]=0);
+
+  function pick(d,shift,need,excl=[]) {
+    const isHol=isSpecialDay(ri,d);
+    let cands=ar.filter(r=>{
+      if(excl.includes(r.id)) return false;
+      if(isUnavail(r.id,ri,d)) return false;
+      if(alreadyToday(r.id,ri,d)) return false;
+      if(violatesHard(r.id,ri,d,shift)) return false;
+      if(rem[r.id]<=0) return false;
+      return true;
+    });
+    cands.sort((a,b)=>{
+      const sp=softPenalty(a.id,ri,d,shift)-softPenalty(b.id,ri,d,shift);
+      if(sp!==0) return sp;
+      if(isHol){ const hd=holCnt[a.id]-holCnt[b.id]; if(hd!==0) return hd; }
+      const td=typeImbalance(a.id,ri,shift,typeCnt)-typeImbalance(b.id,ri,shift,typeCnt);
+      if(Math.abs(td)>0.3) return td;
+      const qd=rem[b.id]-rem[a.id];
+      if(qd!==0) return qd;
+      return b.year-a.year;
+    });
+    return cands.slice(0,need);
+  }
+
+  function pickSenior(d,shift,count) {
+    const cur=[];
+    const isHol=isSpecialDay(ri,d);
+    const elig=ar.filter(r=>!isUnavail(r.id,ri,d)&&!alreadyToday(r.id,ri,d)&&!violatesHard(r.id,ri,d,shift)&&rem[r.id]>0);
+    const srt=(a,b)=>{
+      const sp=softPenalty(a.id,ri,d,shift)-softPenalty(b.id,ri,d,shift);
+      if(sp!==0) return sp;
+      if(isHol){ const hd=holCnt[a.id]-holCnt[b.id]; if(hd!==0) return hd; }
+      const td=typeImbalance(a.id,ri,shift,typeCnt)-typeImbalance(b.id,ri,shift,typeCnt);
+      if(Math.abs(td)>0.3) return td;
+      return rem[b.id]-rem[a.id];
+    };
+    const yr3=elig.filter(r=>r.year===3).sort(srt);
+    const yr2=elig.filter(r=>r.year===2).sort(srt);
+    if(yr3.length>0) cur.push(yr3[0].id);
+    else if(yr2.length>=(shift==='N'?1:2)){ cur.push(yr2[0].id); if(shift!=='N'&&yr2.length>=2) cur.push(yr2[1].id); }
+    else if(yr2.length===1) cur.push(yr2[0].id);
+    pick(d,shift,count-cur.length,cur).forEach(r=>cur.push(r.id));
+    return cur.slice(0,count);
+  }
+
+  function assign(d,shift,rids) {
+    const isHol=isSpecialDay(ri,d);
+    rids.forEach(rid=>{
+      if(!perRot[ri].sched[d][shift].includes(rid)){
+        perRot[ri].sched[d][shift].push(rid);
+        rem[rid]--; typeCnt[rid][shift]++;
+        if(isHol) holCnt[rid]++;
+      }
+    });
+  }
+
+  for(let d=1;d<=ROTATE_DAYS;d++){
+    for(const s of SHIFTS) assign(d,s,pickSenior(d,s,3));
+  }
+  for(const exp of [{s:'A',max:4},{s:'M',max:4},{s:'A',max:5}]){
+    for(let d=1;d<=ROTATE_DAYS;d++){
+      if(exp.s==='M'&&isTue(ri,d)) continue;
+      const cur=perRot[ri].sched[d][exp.s];
+      if(cur.length<exp.max) assign(d,exp.s,pick(d,exp.s,exp.max-cur.length,cur).map(r=>r.id));
+    }
+  }
+
+  saveState(); renderTable(); renderFairness();
+  showToast('✅ จัดตารางอัตโนมัติเสร็จแล้ว','ok');
+}
+
+function clearSchedule(){
+  for(let d=1;d<=ROTATE_DAYS;d++) perRot[RI].sched[d]={M:[],A:[],N:[]};
+  saveState(); renderTable(); renderFairness();
+  showToast('🗑 ล้างตารางแล้ว','ok');
+}
+
+// ============================================================
+// RENDER ROTATE CHIPS
+// ============================================================
+function renderRotateChips(containerId, activeRi, clickFn) {
+  const el = document.getElementById(containerId);
+  if(!el) return;
+  el.innerHTML = rotates.map((r,i)=>`
+    <div class="rotate-chip${i===activeRi?' active':''}" onclick="${clickFn}(${i})">
+      ${r.label}
+      <span class="rc-dates">${r.dateRange}</span>
+    </div>`).join('');
+}
+function selectRotate(i){ RI=i; renderAll(); }
+
+// ============================================================
+// RENDER TABLE
+// ============================================================
+function renderTable(){
+  const ri=RI, rot=rotates[ri];
+  document.getElementById('rot-title').textContent=`${rot.label}`;
+  document.getElementById('rot-sub').textContent=`${rot.dateRange} · 28 DAYS`;
+  document.getElementById('fair-rot-label').textContent=rot.label+' '+rot.dateRange;
+  document.getElementById('hol-rot-label').textContent=rot.label;
+  document.getElementById('res-rot-label').textContent=rot.label;
+  document.getElementById('lv-rot-label').textContent=rot.label;
+  renderRotateChips('rotate-chips', ri, 'selectRotate');
+
+  const tbody=document.getElementById('sched-body');
+  tbody.innerHTML='';
+
+  for(let d=1;d<=ROTATE_DAYS;d++){
+    const dt=rotDay(ri,d);
+    const wd=dt.getDay();
+    const isTu=wd===2, isWk=wd===0||wd===6;
+    const isHol=isHoliday(ri,d), isSp=isWk||isHol;
+    const hasRest=activeRes(ri).some(r=>hadNightYesterday(r.id,ri,d));
+
+    const tr=document.createElement('tr');
+    tr.className='day-row'+(isWk?' weekend':'')+(isHol&&!isWk?' holiday-row':'')+(isTu?' tuesday-row':'')+(hasRest?' rest-day':'');
+
+    // DATE CELL — shows actual calendar date
+    const dc=document.createElement('td');
+    dc.className='date-cell';
+    let tags='';
+    if(isHol) tags+=`<span class="dtag dtag-hol">🎌 ${holName(ri,d)||'หยุด'}</span>`;
+    if(isTu) tags+=`<span class="dtag dtag-tue">เช้าสูงสุด 3</span>`;
+    if(hasRest) tags+=`<span class="dtag dtag-rest">💤 พักดึก</span>`;
+    dc.innerHTML=`
+      <div class="date-full">${dt.getDate()} ${TH_MONTHS[dt.getMonth()+1]} ${dt.getFullYear()+543}</div>
+      <div class="date-dow${isWk?' we':''}${isTu?' tue':''}">${DOW_FULL[wd]}${isSp?' 🌟':''}</div>
+      <div style="font-size:9px;color:var(--light);font-family:'IBM Plex Mono',monospace">วันที่ ${d}/28</div>
+      ${tags?'<div class="date-tags">'+tags+'</div>':''}`;
+    tr.appendChild(dc);
+
+    for(const shift of SHIFTS){
+      const td=document.createElement('td');
+      td.className='shift-cell';
+      const assigned=perRot[ri].sched[d][shift]||[];
+      const cnt=assigned.length;
+      const sOk=cnt>0?seniorOk(assigned,shift):true;
+      const constErr=assigned.filter(rid=>violatesHard(rid,ri,d,shift));
+      const softV=assigned.filter(rid=>softPenalty(rid,ri,d,shift)>0);
+
+      const nl=document.createElement('div');
+      nl.className='names-list';
+      assigned.forEach(rid=>{
+        const r=getR(rid); if(!r) return;
+        const sp=softPenalty(rid,ri,d,shift);
+        const icon=sp>=10?'😴':sp>=8?'😓':'';
+        const chip=document.createElement('div');
+        chip.style.cssText=`background:${r.bg};color:${r.color};border:1px solid ${isSp?'#f59e0b':r.border};display:flex;align-items:center;gap:5px;padding:3px 8px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;transition:all .1s;user-select:none;`;
+        chip.innerHTML=`<span style="width:6px;height:6px;border-radius:50%;background:${isSp?'#f59e0b':r.color};flex-shrink:0;display:inline-block"></span>${icon}${displayName(r)}`;
+        chip.title=`${r.name} ปี ${r.year} | M:${shiftCntByType(rid,ri).M} A:${shiftCntByType(rid,ri).A} N:${shiftCntByType(rid,ri).N}`;
+        chip.onmouseenter=()=>{chip.style.filter='brightness(0.9)';chip.style.transform='translateX(1px)';};
+        chip.onmouseleave=()=>{chip.style.filter='';chip.style.transform='';};
+        chip.onclick=()=>openModal(d,shift);
+        nl.appendChild(chip);
+      });
+      activeRes(ri).forEach(r=>{
+        const lt=lvTypeOf(r.id,ri,d); if(!lt) return;
+        const isLv=lt==='LEAVE';
+        const chip=document.createElement('div');
+        chip.style.cssText=`background:${isLv?'#fee2e2':'#f1f5f9'};color:${isLv?'#dc2626':'#475569'};border:1px solid ${isLv?'#fecaca':'#e2e8f0'};display:flex;align-items:center;gap:5px;padding:3px 8px;border-radius:6px;font-size:12px;font-weight:500;opacity:0.65;text-decoration:line-through;pointer-events:none;`;
+        chip.innerHTML=`<span style="width:6px;height:6px;border-radius:50%;background:${isLv?'#dc2626':'#94a3b8'};flex-shrink:0;display:inline-block"></span>${displayName(r)} (${isLv?'ลา':'งาน'})`;
+        nl.appendChild(chip);
+      });
+      td.appendChild(nl);
+      const ab=document.createElement('div');
+      ab.className='add-slot';ab.innerHTML='＋ แก้ไข';ab.onclick=()=>openModal(d,shift);
+      td.appendChild(ab);
+      const ft=document.createElement('div');
+      ft.className='shift-footer';
+      const cc=cnt>=3?'cnt-ok':cnt>0?'cnt-warn':'cnt-err';
+      ft.innerHTML=`<span class="cnt-badge ${cc}">${cnt} คน</span>`;
+      if(isSp) ft.innerHTML+=`<span class="flag flag-green">🌟</span>`;
+      if(constErr.length>0) ft.innerHTML+=`<span class="flag flag-err">⛔</span>`;
+      if(softV.length>0) ft.innerHTML+=`<span class="flag flag-warn">😴</span>`;
+      if(cnt>0&&cnt<3) ft.innerHTML+=`<span class="flag flag-warn">⚠ขาด</span>`;
+      if(shift==='M'&&isTu&&cnt>3) ft.innerHTML+=`<span class="flag flag-warn">⚠เกิน</span>`;
+      if(!sOk&&cnt>0) ft.innerHTML+=`<span class="flag flag-purple">⚠senior</span>`;
+      td.appendChild(ft);
+      tr.appendChild(td);
+    }
+    tbody.appendChild(tr);
+  }
+  updateStats();
+}
+
+function updateStats(){
+  const ri=RI;
+  const ar=activeRes(ri);
+  let constErr=0,under=0,softW=0;
+  for(let d=1;d<=ROTATE_DAYS;d++){
+    for(const s of SHIFTS){
+      const asgn=perRot[ri].sched[d][s]||[];
+      if(asgn.length>0&&asgn.length<3) under++;
+      asgn.forEach(rid=>{ if(violatesHard(rid,ri,d,s)) constErr++; if(softPenalty(rid,ri,d,s)>0) softW++; });
+      if(s==='M'&&isTue(ri,d)&&asgn.length>3) constErr++;
+    }
+  }
+  const tot={1:0,2:0,3:0};
+  ar.forEach(r=>{ tot[r.year]+=shiftCnt(r.id,ri); });
+  const spreads=ar.map(r=>{ const c=shiftCntByType(r.id,ri); return Math.max(c.M,c.A,c.N)-Math.min(c.M,c.A,c.N); });
+  const maxSp=spreads.length?Math.max(...spreads):0;
+  const holCnts=ar.map(r=>holShiftCnt(r.id,ri));
+  const holSp=holCnts.length?Math.max(...holCnts,0)-Math.min(...holCnts,0):0;
+  document.getElementById('stats-row').innerHTML=`
+    <div class="stat"><div class="stat-label">ปี 1 (เป้า ${QUOTA[1]})</div><div class="stat-val blue">${tot[1]}</div></div>
+    <div class="stat"><div class="stat-label">ปี 2 (เป้า ${QUOTA[2]})</div><div class="stat-val blue">${tot[2]}</div></div>
+    <div class="stat"><div class="stat-label">ปี 3 (เป้า ${QUOTA[3]})</div><div class="stat-val blue">${tot[3]}</div></div>
+    <div class="stat"><div class="stat-label">⛔ Hard Error</div><div class="stat-val ${constErr>0?'err':'ok'}">${constErr}</div></div>
+    <div class="stat"><div class="stat-label">😴 Soft Warn</div><div class="stat-val ${softW>0?'warn':'ok'}">${softW}</div></div>
+    <div class="stat"><div class="stat-label">⚖️ Type Spread</div><div class="stat-val ${maxSp<=2?'ok':maxSp<=4?'warn':'err'}">${maxSp}</div></div>
+    <div class="stat"><div class="stat-label">🌟 Hol Spread</div><div class="stat-val ${holSp<=2?'ok':holSp<=4?'warn':'err'}">${holSp}</div></div>`;
+}
+
+// ============================================================
+// FAIRNESS
+// ============================================================
+function renderFairness(){
+  const ri=RI;
+  const ar=activeRes(ri).map(r=>({...r,cnt:shiftCntByType(r.id,ri),hc:holShiftCnt(r.id,ri)}));
+  const maxM=Math.max(...ar.map(r=>r.cnt.M),1);
+  const maxA=Math.max(...ar.map(r=>r.cnt.A),1);
+  const maxN=Math.max(...ar.map(r=>r.cnt.N),1);
+  document.getElementById('fairness-body').innerHTML=ar.map(r=>`
+    <div class="fc-row">
+      <span class="fc-name" style="color:${r.color}">${displayName(r)}</span>
+      <div class="mini-bars">
+        <div class="mbar-wrap"><div class="mbar-label">M</div><div class="mbar-bg"><div class="mbar-fill" style="width:${Math.round(r.cnt.M/maxM*100)}%;background:#f59e0b"></div></div></div>
+        <div class="mbar-wrap"><div class="mbar-label">A</div><div class="mbar-bg"><div class="mbar-fill" style="width:${Math.round(r.cnt.A/maxA*100)}%;background:#3b82f6"></div></div></div>
+        <div class="mbar-wrap"><div class="mbar-label">N</div><div class="mbar-bg"><div class="mbar-fill" style="width:${Math.round(r.cnt.N/maxN*100)}%;background:#8b5cf6"></div></div></div>
+      </div>
+      <div class="fc-nums">
+        <span style="color:#b45309">${r.cnt.M}</span><span style="color:var(--muted)">/</span>
+        <span style="color:#1d4ed8">${r.cnt.A}</span><span style="color:var(--muted)">/</span>
+        <span style="color:#7c3aed">${r.cnt.N}</span>
+      </div>
+    </div>`).join('');
+  const maxH=Math.max(...ar.map(r=>r.hc),1);
+  const minH=Math.min(...ar.map(r=>r.hc));
+  document.getElementById('hol-stats-body').innerHTML=[...ar].sort((a,b)=>b.hc-a.hc).map(r=>`
+    <div class="hsp-row">
+      <span style="font-weight:600;color:${r.color};min-width:110px">${displayName(r)}</span>
+      <div class="hsp-bw"><div class="hsp-bf" style="width:${maxH?Math.round(r.hc/maxH*100):0}%;background:${r.color}"></div></div>
+      <span class="hsp-num" style="color:${r.hc===Math.max(...ar.map(x=>x.hc))?'var(--err)':r.hc===minH?'var(--ok)':'var(--text)'}">${r.hc}</span>
+    </div>`).join('');
+}
+
+// ============================================================
+// ADD / REMOVE ROTATE
+// ============================================================
+function openAddRotate(){
+  const nextStr = rotates.length>0 ? nextRotateStart(rotates.length-1) : '2026-05-31';
+  const nextDt = new Date(nextStr+'T00:00:00');
+  const endDt = new Date(nextDt); endDt.setDate(endDt.getDate()+ROTATE_DAYS-1);
+  document.getElementById('new-rot-start').value = nextStr;
+  document.getElementById('add-rot-sub').textContent = `รอบที่ ${rotates.length+1}`;
+  updateNewRotPreview();
+  document.getElementById('add-rot-overlay').classList.add('open');
+}
+function updateNewRotPreview(){
+  const val=document.getElementById('new-rot-start').value;
+  if(!val){ document.getElementById('new-rot-preview').textContent=''; return; }
+  const start=new Date(val+'T00:00:00');
+  const end=new Date(start); end.setDate(end.getDate()+ROTATE_DAYS-1);
+  document.getElementById('new-rot-preview').innerHTML=
+    `📅 ${formatDate(start)} – ${formatDate(end)} (28 วัน)`;
+}
+document.getElementById('new-rot-start').addEventListener('input',updateNewRotPreview);
+function closeAddRotate(){ document.getElementById('add-rot-overlay').classList.remove('open'); }
+function confirmAddRotate(){
+  const val=document.getElementById('new-rot-start').value;
+  if(!val){ showToast('⚠ กรุณาเลือกวันเริ่มต้น','err'); return; }
+  createRotate(val);
+  saveState();
+  renderRotateChips('rotate-chips',RI,'selectRotate');
+  closeAddRotate();
+  showToast(`✅ เพิ่มรอบที่ ${rotates.length} แล้ว`,'ok');
+}
+
+// ============================================================
+// HOLIDAYS
+// ============================================================
+function renderHolChips(){
+  const ri=RI, rot=rotates[ri];
+  const startStr=`${rot.startDate.getFullYear()}-${String(rot.startDate.getMonth()+1).padStart(2,'0')}-${String(rot.startDate.getDate()).padStart(2,'0')}`;
+  const endStr=`${rot.endDate.getFullYear()}-${String(rot.endDate.getMonth()+1).padStart(2,'0')}-${String(rot.endDate.getDate()).padStart(2,'0')}`;
+  document.getElementById('hol-date-input').min=startStr;
+  document.getElementById('hol-date-input').max=endStr;
+  document.getElementById('hol-chips').innerHTML=perRot[ri].holidays.map((h,i)=>{
+    const dt=new Date(h.date+'T00:00:00');
+    return `<div class="hol-chip">🎌 ${dt.getDate()} ${TH_MONTHS[dt.getMonth()+1]} — ${h.name}<button class="hol-rm" onclick="removeHoliday(${i})">×</button></div>`;
+  }).join('')||'<span style="font-size:12px;color:var(--muted)">ยังไม่มีวันหยุดนักขัตฤกษ์</span>';
+}
+function addHoliday(){
+  const ri=RI, rot=rotates[ri];
+  const date=document.getElementById('hol-date-input').value;
+  const name=document.getElementById('hol-name-input').value.trim()||'วันหยุดนักขัตฤกษ์';
+  if(!date){ showToast('⚠ กรุณาเลือกวันที่','err'); return; }
+  const dt=new Date(date+'T00:00:00');
+  if(dt<rot.startDate||dt>rot.endDate){ showToast('⚠ วันที่ไม่อยู่ในรอบนี้','err'); return; }
+  if(perRot[ri].holidays.find(h=>h.date===date)){ showToast('⚠ มีอยู่แล้ว','err'); return; }
+  perRot[ri].holidays.push({date,name});
+  perRot[ri].holidays.sort((a,b)=>a.date.localeCompare(b.date));
+  saveState(); renderHolChips(); renderTable();
+  document.getElementById('hol-name-input').value='';
+  showToast('✅ เพิ่มวันหยุดแล้ว','ok');
+}
+function removeHoliday(idx){ perRot[RI].holidays.splice(idx,1); saveState(); renderHolChips(); renderTable(); }
+
+// ============================================================
+// RESIDENTS
+// ============================================================
+function renderResGrid(){
+  const ri=RI, grid=document.getElementById('res-grid');
+  grid.innerHTML='';
+  const cols={1:'#059669',2:'#2563eb',3:'#9333ea'};
+  [1,2,3].forEach(yr=>{
+    const card=document.createElement('div');
+    card.className='yr-card';
+    const actCnt=RES.filter(r=>r.year===yr&&perRot[ri].active[r.id]!==false).length;
+    card.innerHTML=`<div class="yr-card-hd"><span style="color:${cols[yr]};font-weight:700;font-size:15px">ปี ${yr}</span><span style="font-size:11px;color:var(--muted)">อยู่เวร ${actCnt} คน · เป้า ${QUOTA[yr]}</span></div>`;
+    RES.filter(r=>r.year===yr).forEach(r=>{
+      const isOn=perRot[ri].active[r.id]!==false;
+      const c=shiftCntByType(r.id,ri);
+      const row=document.createElement('div');
+      row.className='res-row';
+      row.innerHTML=`
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="width:10px;height:10px;border-radius:3px;background:${r.bg};border:2px solid ${r.color};display:inline-block;flex-shrink:0"></span>
+          <div>
+            <div style="font-weight:600;font-size:13px;color:${r.color}">${displayName(r)}</div>
+            <div style="font-size:11px;color:var(--muted)">M:${c.M} A:${c.A} N:${c.N} · รวม:${c.total}/${QUOTA[r.year]} · PIN:${r.pin}</div>
+          </div>
+        </div>
+        <div class="toggle${isOn?' on':''}" onclick="toggleRes('${r.id}')"></div>`;
+      card.appendChild(row);
+    });
+    grid.appendChild(card);
+  });
+}
+function toggleRes(id){
+  const ri=RI;
+  perRot[ri].active[id] = perRot[ri].active[id]===false ? true : false;
+  saveState(); renderResGrid(); renderTable();
+}
+
+// ============================================================
+// LEAVES (admin)
+// ============================================================
+function renderLeaveSelect(){
+  document.getElementById('lv-res').innerHTML=activeRes(RI).map(r=>`<option value="${r.id}">${displayName(r)}</option>`).join('');
+  updateQuotaDisplay();
+}
+function updateQuotaDisplay(){
+  const ri=RI, rid=document.getElementById('lv-res').value;
+  const used=perRot[ri].lvs.filter(l=>l.residentId===rid&&l.type==='LEAVE').length;
+  document.getElementById('quota-display').innerHTML=`ลา: <strong>${used}/4</strong> · งานอื่น: ${perRot[ri].lvs.filter(l=>l.residentId===rid&&l.type==='AWAY').length}`;
+}
+function renderLeaveList(){
+  const ri=RI, rot=rotates[ri];
+  document.getElementById('lv-cnt').textContent=perRot[ri].lvs.length;
+  const entries=document.getElementById('lv-entries');
+  if(!perRot[ri].lvs.length){ entries.innerHTML='<div style="padding:24px;text-align:center;color:var(--muted)">ยังไม่มีคำขอ</div>'; return; }
+  entries.innerHTML=[...perRot[ri].lvs].sort((a,b)=>a.date.localeCompare(b.date)).map(lv=>{
+    const r=getR(lv.residentId);
+    const dt=new Date(lv.date+'T00:00:00');
+    const ds=`${dt.getDate()} ${TH_MONTHS[dt.getMonth()+1]} ${dt.getFullYear()+543} ${DOW_TH[dt.getDay()]}`;
+    const ri2=perRot[ri].lvs.indexOf(lv);
+    return `<div class="lv-entry">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="width:10px;height:10px;border-radius:3px;background:${r?.bg};border:2px solid ${r?.color};display:inline-block;flex-shrink:0"></span>
+        <div>
+          <div style="font-weight:600;font-size:13px;color:${r?.color}">${r?displayName(r):lv.residentId}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px">${ds}${lv.note?' · '+lv.note:''}</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span class="lv-badge lv-${lv.type}">${lv.type==='LEAVE'?'ลาพักร้อน':'งานอื่น'}</span>
+        <button class="del-btn" onclick="adminRemoveLv(${ri2})">×</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+function addLeave(){
+  const ri=RI, rot=rotates[ri];
+  const rid=document.getElementById('lv-res').value;
+  const date=document.getElementById('lv-date').value;
+  const type=document.getElementById('lv-type').value;
+  const note=document.getElementById('lv-note').value.trim();
+  if(!date){ showToast('⚠ กรุณาเลือกวันที่','err'); return; }
+  const dt=new Date(date+'T00:00:00');
+  if(dt<rot.startDate||dt>rot.endDate){ showToast('⚠ วันที่ไม่อยู่ในรอบนี้','err'); return; }
+  if(type==='LEAVE'&&perRot[ri].lvs.filter(l=>l.residentId===rid&&l.type==='LEAVE').length>=4){ showToast('⚠ ใช้สิทธิ์ 4 วันครบแล้ว','err'); return; }
+  if(perRot[ri].lvs.find(l=>l.residentId===rid&&l.date===date)){ showToast('⚠ วันนี้มีคำขอแล้ว','err'); return; }
+  perRot[ri].lvs.push({residentId:rid,date,type,note});
+  // Remove from schedule if assigned
+  const d=dt.getDate()-rot.startDate.getDate()+1+ (dt.getMonth()-rot.startDate.getMonth())*30;
+  // Recalculate day index properly
+  const dayIdx=Math.round((dt-rot.startDate)/(1000*60*60*24))+1;
+  if(dayIdx>=1&&dayIdx<=28) SHIFTS.forEach(s=>{ perRot[ri].sched[dayIdx][s]=(perRot[ri].sched[dayIdx][s]||[]).filter(id=>id!==rid); });
+  saveState(); renderLeaveList(); renderTable(); updateQuotaDisplay();
+  document.getElementById('lv-note').value='';
+  showToast('✅ เพิ่มคำขอลาแล้ว','ok');
+}
+function adminRemoveLv(idx){ perRot[RI].lvs.splice(idx,1); saveState(); renderLeaveList(); renderTable(); }
+
+// ============================================================
+// MODAL
+// ============================================================
+let mCtx={};
+function openModal(d,shift){
+  const ri=RI, rot=rotates[ri];
+  mCtx={d,shift};
+  const dt=rotDay(ri,d); const wd=dt.getDay();
+  const isTu=wd===2, isHol=isSpecialDay(ri,d);
+  const assigned=[...(perRot[ri].sched[d][shift]||[])];
+  document.getElementById('modal-h').textContent=`เวร${SNAME[shift]} — ${formatDate(dt)} (วันที่ ${d}/28)`;
+  document.getElementById('modal-sub').textContent=`${STIME[shift]} · ${rot.label} ${rot.dateRange}`;
+  let infos='';
+  if(isHol) infos+=`<div class="info-box orange">🌟 วันหยุด${holName(ri,d)?' — '+holName(ri,d):''}</div>`;
+  if(isTu&&shift==='M') infos+=`<div class="info-box yellow">⚠ วันอังคาร เวรเช้าสูงสุด 3 คน (${assigned.length}/3)</div>`;
+  if(!seniorOk(assigned,shift)&&assigned.length>0) infos+=`<div class="info-box purple">⚠ ควรมีปี 3 ≥1 หรือ ปี 2 ≥${shift==='N'?1:2}</div>`;
+  document.getElementById('modal-infos').innerHTML=infos;
+  const picker=document.getElementById('modal-picker');
+  picker.innerHTML='';
+  activeRes(ri).sort((a,b)=>b.year-a.year||a.name.localeCompare(b.name)).forEach(r=>{
+    const isSel=assigned.includes(r.id);
+    const unav=isUnavail(r.id,ri,d);
+    const other=!isSel&&alreadyToday(r.id,ri,d);
+    const hard=!isSel&&violatesHard(r.id,ri,d,shift);
+    const blocked=unav||other||hard;
+    const sp=softPenalty(r.id,ri,d,shift);
+    const c=shiftCntByType(r.id,ri);
+    const item=document.createElement('div');
+    item.className='pick-item'+(isSel?' selected':'')+(blocked?' unavail':'');
+    if(!blocked&&!isSel) item.style.borderLeft=`3px solid ${r.color}`;
+    if(isSel) item.style.cssText=`background:${r.bg};border:1px solid ${r.color};border-left:3px solid ${r.color}`;
+    let meta='';
+    if(unav) meta='🔴 ลา/ไม่ว่าง';
+    else if(other) meta='⬛ มีเวรอื่นวันนี้';
+    else if(hard) meta='⛔ ผิด constraint';
+    else { const w=sp>=10?'😴':sp>=8?'😓':''; meta=`${w?w+' ':''}M:${c.M} A:${c.A} N:${c.N} | รวม:${c.total}/${QUOTA[r.year]}`; }
+    item.innerHTML=`
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="width:10px;height:10px;border-radius:3px;background:${r.bg};border:2px solid ${r.color};flex-shrink:0;display:inline-block"></span>
+        <div><div class="pick-name" style="color:${r.color}">${displayName(r)}</div><div class="pick-meta">${meta}</div></div>
+      </div>
+      ${isSel?'<span style="color:#16a34a;font-size:18px;font-weight:700">✓</span>':''}`;
+    if(!blocked) item.onclick=()=>toggleAssign(r.id,d,shift);
+    picker.appendChild(item);
+  });
+  document.getElementById('overlay').classList.add('open');
+}
+function toggleAssign(rid,d,shift){
+  const ri=RI, arr=perRot[ri].sched[d][shift];
+  const idx=arr.indexOf(rid);
+  if(idx>=0){ arr.splice(idx,1); }
+  else{
+    if(shift==='M'&&isTue(ri,d)&&arr.length>=3){ showToast('⚠ วันอังคาร เช้าสูงสุด 3 คน','err'); return; }
+    arr.push(rid);
+  }
+  saveState(); openModal(d,shift); renderTable(); renderFairness();
+}
+function closeModal(){ document.getElementById('overlay').classList.remove('open'); }
+document.getElementById('overlay').addEventListener('click',e=>{ if(e.target===document.getElementById('overlay')) closeModal(); });
+document.getElementById('add-rot-overlay').addEventListener('click',e=>{ if(e.target===document.getElementById('add-rot-overlay')) closeAddRotate(); });
+
+// ============================================================
+// EXPORT
+// ============================================================
+// ============================================================
+// DOWNLOAD HELPER — works in sandboxed iframes & normal browsers
+// ============================================================
+function triggerDownload(filename, dataUrl) {
+  // Method 1: try standard anchor click
+  try {
+    const a = document.createElement('a');
+    a.href = dataUrl;
+    a.download = filename;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    // Show fallback link after short delay in case click was blocked
+    setTimeout(() => showDownloadFallback(filename, dataUrl), 800);
+  } catch(e) {
+    showDownloadFallback(filename, dataUrl);
+  }
+}
+
+function showDownloadFallback(filename, dataUrl) {
+  // Remove old fallback if any
+  const old = document.getElementById('dl-fallback');
+  if (old) old.remove();
+
+  const bar = document.createElement('div');
+  bar.id = 'dl-fallback';
+  bar.style.cssText = `
+    position:fixed; bottom:80px; right:24px; z-index:400;
+    background:#1e293b; border:1px solid #334155; border-radius:12px;
+    padding:16px 20px; max-width:320px;
+    box-shadow:0 8px 32px rgba(0,0,0,.35);
+    animation: slideUp .25s ease;
+  `;
+  bar.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <span style="color:#f1f5f9;font-weight:700;font-size:13px">📥 พร้อม Download</span>
+      <button onclick="document.getElementById('dl-fallback').remove()" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:18px;line-height:1">×</button>
+    </div>
+    <div style="font-size:11px;color:#64748b;margin-bottom:12px;font-family:'IBM Plex Mono',monospace">${filename}</div>
+    <a href="${dataUrl}" download="${filename}" style="
+      display:block;text-align:center;padding:10px;
+      background:#22c55e;color:#fff;border-radius:8px;
+      font-weight:700;font-size:13px;text-decoration:none;
+    ">⬇ กดที่นี่เพื่อ Download</a>
+  `;
+  document.body.appendChild(bar);
+  // Auto-remove after 30s
+  setTimeout(() => { if(document.getElementById('dl-fallback')) document.getElementById('dl-fallback').remove(); }, 30000);
+}
+
+// ============================================================
+// EXPORT XLSX
+// ============================================================
+function exportXLSX(){
+  const ri=RI, rot=rotates[ri];
+  const ar=activeRes(ri);
+  const wb=XLSX.utils.book_new();
+
+  const rows=[['วันที่','วันที่จริง','DOW','ประเภทวัน','เวร','จำนวน','รายชื่อ']];
+  for(let d=1;d<=ROTATE_DAYS;d++){
+    const dt=rotDay(ri,d);
+    const wd=DOW_FULL[dt.getDay()];
+    const dtype=isHoliday(ri,d)?'วันหยุดนักขัตฤกษ์':isWeekend(ri,d)?'วันหยุด':'วันทำการ';
+    const dateLabel=`${dt.getDate()} ${TH_MONTHS[dt.getMonth()+1]} ${dt.getFullYear()+543}`;
+    SHIFTS.forEach(s=>{
+      const names=(perRot[ri].sched[d][s]||[]).map(id=>{ const r=getR(id); return r?`R${r.year} ${r.name}`:''; }).filter(Boolean).join(', ');
+      rows.push([d,dateLabel,wd,dtype,SNAME[s],(perRot[ri].sched[d][s]||[]).length,names]);
+    });
+  }
+  const ws1=XLSX.utils.aoa_to_sheet(rows);
+  ws1['!cols']=[{wch:5},{wch:18},{wch:10},{wch:16},{wch:6},{wch:6},{wch:60}];
+  XLSX.utils.book_append_sheet(wb,ws1,'ตารางเวร');
+
+  const sum=[['ชื่อ','ปี','เช้า','บ่าย','ดึก','รวม','เป้า','วันหยุด']];
+  ar.forEach(r=>{ const c=shiftCntByType(r.id,ri); sum.push([`R${r.year} ${r.name}`,r.year,c.M,c.A,c.N,c.total,QUOTA[r.year],holShiftCnt(r.id,ri)]); });
+  const ws2=XLSX.utils.aoa_to_sheet(sum);
+  ws2['!cols']=[{wch:16},{wch:5},{wch:7},{wch:7},{wch:7},{wch:6},{wch:6},{wch:8}];
+  XLSX.utils.book_append_sheet(wb,ws2,'สรุปต่อคน');
+
+  const calHeader=['ชื่อ','ปี','รวม','เป้า',...Array.from({length:ROTATE_DAYS},(_,i)=>{ const dt=rotDay(ri,i+1); return `${dt.getDate()}/${dt.getMonth()+1}`; })];
+  const cal=[calHeader];
+  ar.forEach(r=>{
+    const row=[`R${r.year} ${r.name}`,r.year,shiftCnt(r.id,ri),QUOTA[r.year]];
+    for(let d=1;d<=ROTATE_DAYS;d++){
+      let cell='';
+      SHIFTS.forEach(s=>{ if((perRot[ri].sched[d][s]||[]).includes(r.id)) cell=s; });
+      const lt=lvTypeOf(r.id,ri,d);
+      if(lt) cell=lt==='LEAVE'?'ลา':'งาน';
+      row.push(cell);
+    }
+    cal.push(row);
+  });
+  const ws3=XLSX.utils.aoa_to_sheet(cal);
+  ws3['!cols']=[{wch:16},{wch:4},{wch:5},{wch:5},...Array(ROTATE_DAYS).fill({wch:5})];
+  XLSX.utils.book_append_sheet(wb,ws3,'Calendar');
+
+  const filename = `ER_${rot.label.replace(' ','')}_${rot.startStr}.xlsx`;
+  // Generate as base64 data URL for reliable download
+  const wbout = XLSX.write(wb, {bookType:'xlsx', type:'base64'});
+  const dataUrl = `data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,${wbout}`;
+  triggerDownload(filename, dataUrl);
+  showToast('📊 กำลัง Download .xlsx...','ok');
+}
+
+// ============================================================
+// EXPORT CSV
+// ============================================================
+function exportCSV(){
+  const ri=RI, rot=rotates[ri];
+  let rows=['วันที่รอบ,วันที่จริง,DOW,ประเภทวัน,เวร,จำนวน,รายชื่อ'];
+  for(let d=1;d<=ROTATE_DAYS;d++){
+    const dt=rotDay(ri,d);
+    const wd=DOW_FULL[dt.getDay()];
+    const dtype=isHoliday(ri,d)?'วันหยุดนักขัตฤกษ์':isWeekend(ri,d)?'วันหยุด':'วันทำการ';
+    const ds=`${dt.getDate()}/${dt.getMonth()+1}/${dt.getFullYear()+543}`;
+    SHIFTS.forEach(s=>{
+      const names=(perRot[ri].sched[d][s]||[]).map(id=>getR(id)?.name||'').join(' | ');
+      rows.push(`${d},${ds},${wd},${dtype},${SNAME[s]},${(perRot[ri].sched[d][s]||[]).length},"${names}"`);
+    });
+  }
+  const csv = '\uFEFF' + rows.join('\n');
+  const b64 = btoa(unescape(encodeURIComponent(csv)));
+  const dataUrl = `data:text/csv;charset=utf-8;base64,${b64}`;
+  const filename = `ER_${rot.label.replace(' ','')}_${rot.startStr}.csv`;
+  triggerDownload(filename, dataUrl);
+  showToast('✅ กำลัง Download .csv...','ok');
+}
+
+
+// ============================================================
+// NAV
+// ============================================================
+function switchTab(tab,btn){
+  document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tab-'+tab).classList.add('active');
+  if(btn) btn.classList.add('active');
+  if(tab==='fairness') renderFairness();
+  if(tab==='holidays') renderHolChips();
+  if(tab==='residents') renderResGrid();
+  if(tab==='leaves'){ renderLeaveSelect(); renderLeaveList(); }
+  if(tab==='settings'){ renderNameEditGrid(); renderSavedEmails(); }
+}
+function renderAll(){
+  renderRotateChips('rotate-chips',RI,'selectRotate');
+  renderTable(); renderFairness();
+  // Update holiday/resident/leave labels
+  if(document.getElementById('tab-holidays').classList.contains('active')) renderHolChips();
+  if(document.getElementById('tab-residents').classList.contains('active')) renderResGrid();
+  if(document.getElementById('tab-leaves').classList.contains('active')){ renderLeaveSelect(); renderLeaveList(); }
+  if(document.getElementById('tab-settings').classList.contains('active')){ renderNameEditGrid(); renderSavedEmails(); }
+}
+function showToast(msg,type='ok'){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.className=`toast ${type} show`;
+  setTimeout(()=>t.classList.remove('show'),2800);
+}
+
+// ============================================================
+// SETTINGS — Edit Resident Names
+// ============================================================
+let nameOverrides = {};
+
+function loadNameOverrides() {
+  try {
+    const s = localStorage.getItem('er28_names');
+    if (s) {
+      nameOverrides = JSON.parse(s);
+      RES.forEach(r => { if (nameOverrides[r.id]) r.name = nameOverrides[r.id]; });
+    }
+  } catch(e) {}
+}
+function renderNameEditGrid() {
+  const grid = document.getElementById('name-edit-grid');
+  if (!grid) return;
+  grid.innerHTML = RES.map(r => `
+    <div class="name-edit-row">
+      <div class="name-edit-swatch" style="background:${r.color};border:1px solid ${r.border}"></div>
+      <span class="name-edit-label">R${r.year}</span>
+      <input class="name-edit-input" id="ne-${r.id}" value="${r.name}" placeholder="${r.name}">
+    </div>`).join('');
+}
+function saveResidentNames() {
+  RES.forEach(r => {
+    const el = document.getElementById(`ne-${r.id}`);
+    if (!el) return;
+    const newName = el.value.trim();
+    if (newName) { r.name = newName; nameOverrides[r.id] = newName; }
+  });
+  try { localStorage.setItem('er28_names', JSON.stringify(nameOverrides)); } catch(e) {}
+  renderTable(); renderFairness(); renderResGrid(); renderLeaveSelect();
+  showToast('✅ บันทึกชื่อแล้ว', 'ok');
+}
+
+// ============================================================
+// SETTINGS — Saved Emails
+// ============================================================
+let savedEmails = [];
+
+function loadSavedEmails() {
+  try { const s=localStorage.getItem('er28_emails'); if(s) savedEmails=JSON.parse(s); } catch(e) {}
+}
+function saveSavedEmails() {
+  try { localStorage.setItem('er28_emails', JSON.stringify(savedEmails)); } catch(e) {}
+}
+function renderSavedEmails() {
+  const el = document.getElementById('saved-emails-list');
+  if (!el) return;
+  el.innerHTML = savedEmails.map((e,i) => `
+    <div class="email-chip">
+      ✉️ ${e.label||e.email}
+      <button class="email-chip-rm" onclick="removeEmail(${i})">×</button>
+    </div>`).join('') || '<span style="font-size:12px;color:var(--muted)">ยังไม่มีอีเมลที่บันทึก</span>';
+}
+function saveEmail() {
+  const email = document.getElementById('new-email-input').value.trim();
+  const label = document.getElementById('new-email-label').value.trim();
+  if (!email || !email.includes('@')) { showToast('⚠ กรุณากรอกอีเมลที่ถูกต้อง','err'); return; }
+  if (savedEmails.find(e=>e.email===email)) { showToast('⚠ อีเมลนี้มีอยู่แล้ว','err'); return; }
+  savedEmails.push({email, label: label||email});
+  saveSavedEmails(); renderSavedEmails();
+  document.getElementById('new-email-input').value='';
+  document.getElementById('new-email-label').value='';
+  showToast('✅ บันทึกอีเมลแล้ว','ok');
+}
+function removeEmail(i) { savedEmails.splice(i,1); saveSavedEmails(); renderSavedEmails(); }
+
+// ============================================================
+// EXPORT JPEG (html2canvas)
+// ============================================================
+async function exportJPEG() {
+  const ri=RI, rot=rotates[ri];
+  const ov=document.createElement('div');
+  ov.style.cssText='position:fixed;inset:0;background:rgba(15,23,42,.75);color:#fff;font-size:15px;font-weight:700;z-index:9999;display:flex;align-items:center;justify-content:center;gap:12px;';
+  ov.innerHTML='<span style="font-size:28px">📸</span> กำลังสร้างภาพ...';
+  document.body.appendChild(ov);
+  try {
+    const target = document.querySelector('.table-wrap');
+    const canvas = await html2canvas(target, { scale:2, useCORS:true, backgroundColor:'#ffffff', logging:false });
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+    const filename = `ER_${rot.label.replace(' ','')}_${rot.startStr}.jpeg`;
+    triggerDownload(filename, dataUrl);
+    showToast('🖼️ กำลัง Download ภาพ...','ok');
+  } catch(e) {
+    showToast('⚠ ไม่สามารถสร้างภาพได้','err');
+    console.error(e);
+  } finally {
+    document.body.removeChild(ov);
+  }
+}
+
+// ============================================================
+// EMAIL MODAL
+// ============================================================
+function openEmailModal() {
+  const ri=RI, rot=rotates[ri];
+  document.getElementById('email-rot-label').textContent=`${rot.label} (${rot.dateRange})`;
+  document.getElementById('email-subject').value=`ตารางเวร ER จุฬาฯ — ${rot.label} (${rot.dateRange})`;
+  document.getElementById('email-body').value=`เรียน ทีมงาน ER จุฬาฯ\n\nแนบตารางเวร Resident ${rot.label}\nช่วงวันที่: ${rot.dateRange}\n\nโปรดตรวจสอบตารางเวรและแจ้งหากมีการแก้ไข\n\nขอบคุณครับ/ค่ะ`;
+  // Quick buttons from saved emails
+  const qb=document.getElementById('email-quick-btns');
+  qb.innerHTML=savedEmails.map(e=>`<div class="email-chip" onclick="document.getElementById('email-to').value='${e.email}'">✉️ ${e.label}</div>`).join('');
+  document.getElementById('email-overlay').classList.add('open');
+}
+function closeEmailModal() { document.getElementById('email-overlay').classList.remove('open'); }
+document.getElementById('email-overlay').addEventListener('click',e=>{ if(e.target===document.getElementById('email-overlay')) closeEmailModal(); });
+
+async function sendEmail() {
+  const to=document.getElementById('email-to').value.trim();
+  const cc=document.getElementById('email-cc').value.trim();
+  const subject=document.getElementById('email-subject').value.trim();
+  const body=document.getElementById('email-body').value.trim();
+  const attachXlsx=document.getElementById('attach-xlsx').checked;
+  const attachJpeg=document.getElementById('attach-jpeg').checked;
+  if (!to||!to.includes('@')) { showToast('⚠ กรุณากรอกอีเมลผู้รับ','err'); return; }
+  if (attachXlsx) exportXLSX();
+  if (attachJpeg) await exportJPEG();
+  const ccPart=cc?`cc=${encodeURIComponent(cc)}&`:'';
+  const note='\n\n[โปรดแนบไฟล์ที่ download มาด้วย]';
+  window.location.href=`mailto:${encodeURIComponent(to)}?${ccPart}subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body+note)}`;
+  closeEmailModal();
+  showToast('📨 เปิด Mail app แล้ว','ok');
+}
+
+// ============================================================
+// CLEAR ALL DATA
+// ============================================================
+function clearAllData() {
+  if (!confirm('ยืนยันการล้างข้อมูลทั้งหมด?\nตาราง, คำขอลา, และรอบทั้งหมดจะถูกลบ')) return;
+  ['er28_rotates','er28_perRot','er28_hols'].forEach(k=>localStorage.removeItem(k));
+  rotates=[]; perRot=[];
+  createRotate('2026-05-31');
+  RI=0; saveState();
+  renderRotateChips('rotate-chips',RI,'selectRotate');
+  renderTable(); renderFairness();
+  showToast('🗑 ล้างข้อมูลทั้งหมดแล้ว','ok');
+}
+
+// ============================================================
+// INIT
+// ============================================================
+(()=>{
+  loadNameOverrides();
+  loadSavedEmails();
+  const loaded=loadState();
+  if(!loaded || rotates.length===0){
+    createRotate('2026-05-31');
+    saveState();
+  }
+  RI=0;
+  renderRotateChips('rotate-chips',RI,'selectRotate');
+  renderTable();
+  renderFairness();
+})();
+</script>
+</body>
+</html>
