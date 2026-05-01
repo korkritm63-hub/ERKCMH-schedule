@@ -47,16 +47,16 @@ header{background:#0f172a;color:#fff;padding:0 24px;height:56px;display:flex;ali
 .btn-sm{padding:5px 10px;font-size:12px;}
 
 /* ROTATE SELECTOR */
-.rotate-bar{background:#fff;border:1px solid var(--border);border-radius:10px;padding:12px 20px;margin-bottom:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;box-shadow:0 1px 3px rgba(0,0,0,.05);}
-.rotate-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);}
-.rotate-chips{display:flex;gap:6px;flex-wrap:wrap;flex:1;}
-.rotate-chip{padding:6px 14px;border-radius:20px;border:2px solid var(--border);background:#fff;cursor:pointer;font-size:12px;font-weight:600;transition:all .12s;font-family:'IBM Plex Mono',monospace;color:var(--muted);}
-.rotate-chip:hover{border-color:var(--accent);color:var(--accent);}
-.rotate-chip.active{border-color:#ef4444;background:#fef2f2;color:#ef4444;}
-.rotate-chip .rc-dates{font-size:10px;font-weight:400;display:block;color:var(--muted);}
+.rotate-bar{background:#fff;border:1px solid var(--border);border-radius:10px;margin-bottom:16px;display:flex;align-items:center;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.05);}
+.rotate-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);padding:0 14px;white-space:nowrap;border-right:1px solid var(--border);height:44px;display:flex;align-items:center;background:var(--surface2);}
+.rotate-chips{display:flex;flex:1;overflow-x:auto;scrollbar-width:none;}  .rotate-chips::-webkit-scrollbar{display:none;}
+.rotate-chip{padding:0 14px;height:44px;border:none;border-right:1px solid var(--border);background:#fff;cursor:pointer;font-size:12px;font-weight:600;transition:all .12s;font-family:'IBM Plex Mono',monospace;color:var(--muted);white-space:nowrap;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;flex-shrink:0;}
+.rotate-chip:hover{background:#f0f9ff;color:var(--accent);}
+.rotate-chip.active{background:#fef2f2;color:#ef4444;border-bottom:3px solid #ef4444;}
+.rotate-chip .rc-dates{font-size:9px;font-weight:400;display:block;color:var(--muted);line-height:1;}
 .rotate-chip.active .rc-dates{color:#f87171;}
-.add-rotate-btn{padding:6px 12px;border-radius:7px;border:1px dashed var(--border2);background:transparent;cursor:pointer;font-size:12px;color:var(--muted);transition:all .12s;font-family:'Sarabun',sans-serif;}
-.add-rotate-btn:hover{border-color:var(--accent);color:var(--accent);background:#f0f9ff;}
+.add-rotate-btn{padding:0 14px;height:44px;border:none;border-left:1px solid var(--border);background:transparent;cursor:pointer;font-size:12px;color:var(--muted);transition:all .12s;font-family:'Sarabun',sans-serif;white-space:nowrap;flex-shrink:0;}
+.add-rotate-btn:hover{color:var(--accent);background:#f0f9ff;}
 
 /* STATS */
 .stats-row{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin-bottom:16px;}
@@ -248,7 +248,7 @@ th.col-N{min-width:185px;background:#3b0764;border-left:3px solid #8b5cf6;}
 <div id="tab-schedule" class="tab-content active">
   <div class="toolbar">
     <div class="toolbar-left">
-      <div><div class="page-title" id="rot-title">รอบที่ 1</div><div class="page-sub" id="rot-sub">28 DAYS</div></div>
+      <div><div class="page-title" id="rot-title">Rotate 1</div><div class="page-sub" id="rot-sub">28 DAYS</div></div>
     </div>
     <button class="btn btn-red" onclick="autoSchedule()">⚡ Auto-จัด</button>
     <button class="btn btn-outline" onclick="clearSchedule()">🗑 ล้าง</button>
@@ -258,9 +258,9 @@ th.col-N{min-width:185px;background:#3b0764;border-left:3px solid #8b5cf6;}
 
   <!-- ROTATE SELECTOR -->
   <div class="rotate-bar">
-    <span class="rotate-label">รอบ</span>
+    <span class="rotate-label">Rotate</span>
     <div class="rotate-chips" id="rotate-chips"></div>
-    <button class="add-rotate-btn" onclick="openAddRotate()">＋ เพิ่มรอบ</button>
+    <button class="add-rotate-btn" onclick="openAddRotate()">＋ Add Rotate</button>
   </div>
 
   <div class="stats-row" id="stats-row"></div>
@@ -289,7 +289,7 @@ th.col-N{min-width:185px;background:#3b0764;border-left:3px solid #8b5cf6;}
 <div id="tab-fairness" class="tab-content">
   <div class="toolbar" style="margin-bottom:16px">
     <div class="toolbar-left"><div class="page-title">⚖️ Fairness Dashboard</div></div>
-    <span style="font-size:12px;color:var(--muted)">รอบปัจจุบัน: <span id="fair-rot-label" style="font-weight:700;color:var(--text)">-</span></span>
+    <span style="font-size:12px;color:var(--muted)">Rotate ปัจจุบัน: <span id="fair-rot-label" style="font-weight:700;color:var(--text)">-</span></span>
   </div>
   <div class="fairness-wrap">
     <div class="fc"><div class="fc-hd">📊 M / A / N ต่อคน</div><div class="fc-body" id="fairness-body"></div></div>
@@ -301,7 +301,7 @@ th.col-N{min-width:185px;background:#3b0764;border-left:3px solid #8b5cf6;}
 <div id="tab-holidays" class="tab-content">
   <div class="toolbar" style="margin-bottom:16px">
     <div class="toolbar-left"><div class="page-title">วันหยุดนักขัตฤกษ์</div></div>
-    <span style="font-size:12px;color:var(--muted)">รอบ: <span id="hol-rot-label" style="font-weight:700;color:var(--text)">-</span></span>
+    <span style="font-size:12px;color:var(--muted)">Rotate: <span id="hol-rot-label" style="font-weight:700;color:var(--text)">-</span></span>
   </div>
   <div class="hol-editor">
     <div class="hol-chips" id="hol-chips"></div>
@@ -316,8 +316,8 @@ th.col-N{min-width:185px;background:#3b0764;border-left:3px solid #8b5cf6;}
 <!-- RESIDENTS -->
 <div id="tab-residents" class="tab-content">
   <div class="toolbar" style="margin-bottom:16px">
-    <div class="toolbar-left"><div class="page-title">Residents — รอบ <span id="res-rot-label">-</span></div></div>
-    <span style="font-size:12px;color:var(--muted)">Toggle ON/OFF สำหรับรอบนี้เท่านั้น (บันทึกแยกต่างหากแต่ละรอบ)</span>
+    <div class="toolbar-left"><div class="page-title">Residents — <span id="res-rot-label">-</span></div></div>
+    <span style="font-size:12px;color:var(--muted)">Toggle ON/OFF สำหรับรอบนี้เท่านั้น (บันทึกแยกต่างหากแต่ละ Rotate)</span>
   </div>
   <div class="res-grid" id="res-grid"></div>
 </div>
@@ -325,7 +325,7 @@ th.col-N{min-width:185px;background:#3b0764;border-left:3px solid #8b5cf6;}
 <!-- LEAVES -->
 <div id="tab-leaves" class="tab-content">
   <div class="toolbar" style="margin-bottom:16px">
-    <div class="toolbar-left"><div class="page-title">คำขอลา — รอบ <span id="lv-rot-label">-</span></div></div>
+    <div class="toolbar-left"><div class="page-title">คำขอลา — <span id="lv-rot-label">-</span></div></div>
   </div>
   <div class="lv-grid">
     <div class="lv-form">
@@ -334,7 +334,7 @@ th.col-N{min-width:185px;background:#3b0764;border-left:3px solid #8b5cf6;}
       <div class="form-group"><label class="form-label">วันที่</label><input type="date" class="form-ctrl" id="lv-date"></div>
       <div class="form-group"><label class="form-label">ประเภท</label>
         <select class="form-ctrl" id="lv-type">
-          <option value="LEAVE">🔴 ลาพักร้อน (สิทธิ์ 4 วัน/รอบ)</option>
+          <option value="LEAVE">🔴 ลาพักร้อน (สิทธิ์ 4 วัน/Rotate)</option>
           <option value="AWAY">⬛ งานอื่น / ติว / ธุระ</option>
         </select>
       </div>
@@ -429,10 +429,10 @@ th.col-N{min-width:185px;background:#3b0764;border-left:3px solid #8b5cf6;}
 <!-- ADD ROTATE MODAL -->
 <div class="overlay" id="add-rot-overlay">
   <div class="modal add-rotate-modal">
-    <h3>เพิ่มรอบ Rotate ใหม่</h3>
-    <div class="modal-sub" id="add-rot-sub">รอบถัดไปจะเริ่มต้น...</div>
+    <h3>เพิ่ม Rotate ใหม่</h3>
+    <div class="modal-sub" id="add-rot-sub">Rotate ถัดไปจะเริ่มต้น...</div>
     <div class="form-group" style="margin-top:16px">
-      <label class="form-label">วันเริ่มต้นรอบ</label>
+      <label class="form-label">วันเริ่มต้น Rotate</label>
       <input type="date" class="form-ctrl" id="new-rot-start">
     </div>
     <div style="font-size:12px;color:var(--muted);margin-bottom:16px" id="new-rot-preview"></div>
@@ -493,7 +493,13 @@ th.col-N{min-width:185px;background:#3b0764;border-left:3px solid #8b5cf6;}
 // CORE: 28-day rotate periods
 // ============================================================
 const ROTATE_DAYS = 28;
+const TOTAL_ROTATES = 13;
+const ROTATE_START = '2026-06-29';
 const QUOTA = {1:22, 2:22, 3:20};
+
+// Rotate 1 = 29 วัน, Rotate 2-13 = 28 วัน
+function getRotateDays(idx) { return (idx % TOTAL_ROTATES) === 12 ? 29 : 28; }
+function rotDays(ri) { return rotates[ri]?.days || getRotateDays(ri); }
 const SHIFTS = ['M','A','N'];
 const SNAME = {M:'เช้า',A:'บ่าย',N:'ดึก'};
 const STIME = {M:'08:00–16:00',A:'16:00–24:00',N:'00:00–08:00'};
@@ -506,14 +512,19 @@ const TH_MONTHS_FULL = ['','มกราคม','กุมภาพันธ์'
 // Each period: startDate, endDate (28 days)
 function makeRotate(startDateStr, idx) {
   const start = new Date(startDateStr + 'T00:00:00');
+  const days = getRotateDays(idx);
   const end = new Date(start);
-  end.setDate(end.getDate() + ROTATE_DAYS - 1);
+  end.setDate(end.getDate() + days - 1);
   const fmt = d => `${d.getDate()} ${TH_MONTHS[d.getMonth()+1]} ${d.getFullYear()+543}`;
+  const fmtShort = d => `${d.getDate()}/${d.getMonth()+1}`;
+  const rotNum = (idx % TOTAL_ROTATES) + 1;
   return {
     idx,
     startStr: startDateStr,
-    label: `รอบ ${idx+1}`,
+    days,
+    label: `Rotate ${rotNum}`,
     dateRange: `${fmt(start)} – ${fmt(end)}`,
+    shortRange: `${fmtShort(start)}–${fmtShort(end)}`,
     startDate: start,
     endDate: end,
   };
@@ -600,7 +611,7 @@ function createRotate(startStr) {
   rotates.push(makeRotate(startStr, ri));
   perRot.push({
     active: Object.fromEntries(RES.map(r=>[r.id, true])),
-    sched: Object.fromEntries(Array.from({length:ROTATE_DAYS},(_,i)=>[i+1,{M:[],A:[],N:[]}])),
+    sched: Object.fromEntries(Array.from({length:getRotateDays(ri)},(_,i)=>[i+1,{M:[],A:[],N:[]}])),
     lvs: [],
     holidays: [],
   });
@@ -637,7 +648,7 @@ function loadState() {
       rotates.forEach((r,i) => {
         r.startDate = new Date(r.startStr+'T00:00:00');
         r.endDate = new Date(r.startDate);
-        r.endDate.setDate(r.endDate.getDate()+ROTATE_DAYS-1);
+        r.endDate.setDate(r.endDate.getDate()+getRotateDays(i)-1);
       });
       return true;
     }
@@ -664,7 +675,7 @@ function lvTypeOf(rid,ri,d) {
 }
 function shiftCntByType(rid,ri) {
   let M=0,A=0,N=0;
-  for(let d=1;d<=ROTATE_DAYS;d++){
+  for(let d=1;d<=rotDays(ri);d++){
     if((perRot[ri].sched[d]?.M||[]).includes(rid)) M++;
     if((perRot[ri].sched[d]?.A||[]).includes(rid)) A++;
     if((perRot[ri].sched[d]?.N||[]).includes(rid)) N++;
@@ -674,7 +685,7 @@ function shiftCntByType(rid,ri) {
 function shiftCnt(rid,ri){ return shiftCntByType(rid,ri).total; }
 function holShiftCnt(rid,ri) {
   let c=0;
-  for(let d=1;d<=ROTATE_DAYS;d++){
+  for(let d=1;d<=rotDays(ri);d++){
     if(!isSpecialDay(ri,d)) continue;
     SHIFTS.forEach(s=>{ if((perRot[ri].sched[d]?.[s]||[]).includes(rid)) c++; });
   }
@@ -717,7 +728,7 @@ function typeImbalance(rid,ri,shift,typeCnt) {
 // ============================================================
 function autoSchedule() {
   const ri=RI;
-  for(let d=1;d<=ROTATE_DAYS;d++) perRot[ri].sched[d]={M:[],A:[],N:[]};
+  for(let d=1;d<=getRotateDays(ri);d++) perRot[ri].sched[d]={M:[],A:[],N:[]};
 
   const ar=activeRes(ri);
   const rem={};
@@ -782,11 +793,11 @@ function autoSchedule() {
     });
   }
 
-  for(let d=1;d<=ROTATE_DAYS;d++){
+  for(let d=1;d<=rotDays(ri);d++){
     for(const s of SHIFTS) assign(d,s,pickSenior(d,s,3));
   }
   for(const exp of [{s:'A',max:4},{s:'M',max:4},{s:'A',max:5}]){
-    for(let d=1;d<=ROTATE_DAYS;d++){
+    for(let d=1;d<=rotDays(ri);d++){
       if(exp.s==='M'&&isTue(ri,d)) continue;
       const cur=perRot[ri].sched[d][exp.s];
       if(cur.length<exp.max) assign(d,exp.s,pick(d,exp.s,exp.max-cur.length,cur).map(r=>r.id));
@@ -798,7 +809,7 @@ function autoSchedule() {
 }
 
 function clearSchedule(){
-  for(let d=1;d<=ROTATE_DAYS;d++) perRot[RI].sched[d]={M:[],A:[],N:[]};
+  for(let d=1;d<=getRotateDays(RI);d++) perRot[RI].sched[d]={M:[],A:[],N:[]};
   saveState(); renderTable(); renderFairness();
   showToast('🗑 ล้างตารางแล้ว','ok');
 }
@@ -810,9 +821,9 @@ function renderRotateChips(containerId, activeRi, clickFn) {
   const el = document.getElementById(containerId);
   if(!el) return;
   el.innerHTML = rotates.map((r,i)=>`
-    <div class="rotate-chip${i===activeRi?' active':''}" onclick="${clickFn}(${i})">
+    <div class="rotate-chip${i===activeRi?' active':''}" onclick="${clickFn}(${i})" title="${r.dateRange}">
       ${r.label}
-      <span class="rc-dates">${r.dateRange}</span>
+      <span class="rc-dates">${r.shortRange}</span>
     </div>`).join('');
 }
 function selectRotate(i){ RI=i; renderAll(); }
@@ -833,7 +844,7 @@ function renderTable(){
   const tbody=document.getElementById('sched-body');
   tbody.innerHTML='';
 
-  for(let d=1;d<=ROTATE_DAYS;d++){
+  for(let d=1;d<=rotDays(ri);d++){
     const dt=rotDay(ri,d);
     const wd=dt.getDay();
     const isTu=wd===2, isWk=wd===0||wd===6;
@@ -915,7 +926,7 @@ function updateStats(){
   const ri=RI;
   const ar=activeRes(ri);
   let constErr=0,under=0,softW=0;
-  for(let d=1;d<=ROTATE_DAYS;d++){
+  for(let d=1;d<=rotDays(ri);d++){
     for(const s of SHIFTS){
       const asgn=perRot[ri].sched[d][s]||[];
       if(asgn.length>0&&asgn.length<3) under++;
@@ -978,7 +989,7 @@ function renderFairness(){
 function openAddRotate(){
   const nextStr = rotates.length>0 ? nextRotateStart(rotates.length-1) : '2026-05-31';
   const nextDt = new Date(nextStr+'T00:00:00');
-  const endDt = new Date(nextDt); endDt.setDate(endDt.getDate()+ROTATE_DAYS-1);
+  const endDt = new Date(nextDt); endDt.setDate(endDt.getDate()+getRotateDays(rotates.length)-1);
   document.getElementById('new-rot-start').value = nextStr;
   document.getElementById('add-rot-sub').textContent = `รอบที่ ${rotates.length+1}`;
   updateNewRotPreview();
@@ -988,7 +999,7 @@ function updateNewRotPreview(){
   const val=document.getElementById('new-rot-start').value;
   if(!val){ document.getElementById('new-rot-preview').textContent=''; return; }
   const start=new Date(val+'T00:00:00');
-  const end=new Date(start); end.setDate(end.getDate()+ROTATE_DAYS-1);
+  const end=new Date(start); end.setDate(end.getDate()+getRotateDays(rotates.length)-1);
   document.getElementById('new-rot-preview').innerHTML=
     `📅 ${formatDate(start)} – ${formatDate(end)} (28 วัน)`;
 }
@@ -1001,7 +1012,7 @@ function confirmAddRotate(){
   saveState();
   renderRotateChips('rotate-chips',RI,'selectRotate');
   closeAddRotate();
-  showToast(`✅ เพิ่มรอบที่ ${rotates.length} แล้ว`,'ok');
+  showToast(`✅ เพิ่ม Rotate ${(rotates.length-1)%13+1} แล้ว`,'ok');
 }
 
 // ============================================================
@@ -1255,7 +1266,7 @@ function exportXLSX(){
   const wb=XLSX.utils.book_new();
 
   const rows=[['วันที่','วันที่จริง','DOW','ประเภทวัน','เวร','จำนวน','รายชื่อ']];
-  for(let d=1;d<=ROTATE_DAYS;d++){
+  for(let d=1;d<=rotDays(ri);d++){
     const dt=rotDay(ri,d);
     const wd=DOW_FULL[dt.getDay()];
     const dtype=isHoliday(ri,d)?'วันหยุดนักขัตฤกษ์':isWeekend(ri,d)?'วันหยุด':'วันทำการ';
@@ -1275,11 +1286,11 @@ function exportXLSX(){
   ws2['!cols']=[{wch:16},{wch:5},{wch:7},{wch:7},{wch:7},{wch:6},{wch:6},{wch:8}];
   XLSX.utils.book_append_sheet(wb,ws2,'สรุปต่อคน');
 
-  const calHeader=['ชื่อ','ปี','รวม','เป้า',...Array.from({length:ROTATE_DAYS},(_,i)=>{ const dt=rotDay(ri,i+1); return `${dt.getDate()}/${dt.getMonth()+1}`; })];
+  const calHeader=['ชื่อ','ปี','รวม','เป้า',...Array.from({length:rotDays(ri)},(_,i)=>{ const dt=rotDay(ri,i+1); return `${dt.getDate()}/${dt.getMonth()+1}`; })];
   const cal=[calHeader];
   ar.forEach(r=>{
     const row=[`R${r.year} ${r.name}`,r.year,shiftCnt(r.id,ri),QUOTA[r.year]];
-    for(let d=1;d<=ROTATE_DAYS;d++){
+    for(let d=1;d<=rotDays(ri);d++){
       let cell='';
       SHIFTS.forEach(s=>{ if((perRot[ri].sched[d][s]||[]).includes(r.id)) cell=s; });
       const lt=lvTypeOf(r.id,ri,d);
@@ -1289,7 +1300,7 @@ function exportXLSX(){
     cal.push(row);
   });
   const ws3=XLSX.utils.aoa_to_sheet(cal);
-  ws3['!cols']=[{wch:16},{wch:4},{wch:5},{wch:5},...Array(ROTATE_DAYS).fill({wch:5})];
+  ws3['!cols']=[{wch:16},{wch:4},{wch:5},{wch:5},...Array(rotDays(ri)).fill({wch:5})];
   XLSX.utils.book_append_sheet(wb,ws3,'Calendar');
 
   const filename = `ER_${rot.label.replace(' ','')}_${rot.startStr}.xlsx`;
@@ -1306,7 +1317,7 @@ function exportXLSX(){
 function exportCSV(){
   const ri=RI, rot=rotates[ri];
   let rows=['วันที่รอบ,วันที่จริง,DOW,ประเภทวัน,เวร,จำนวน,รายชื่อ'];
-  for(let d=1;d<=ROTATE_DAYS;d++){
+  for(let d=1;d<=rotDays(ri);d++){
     const dt=rotDay(ri,d);
     const wd=DOW_FULL[dt.getDay()];
     const dtype=isHoliday(ri,d)?'วันหยุดนักขัตฤกษ์':isWeekend(ri,d)?'วันหยุด':'วันทำการ';
@@ -1486,8 +1497,7 @@ async function sendEmail() {
 function clearAllData() {
   if (!confirm('ยืนยันการล้างข้อมูลทั้งหมด?\nตาราง, คำขอลา, และรอบทั้งหมดจะถูกลบ')) return;
   ['er28_rotates','er28_perRot','er28_hols'].forEach(k=>localStorage.removeItem(k));
-  rotates=[]; perRot=[];
-  createRotate('2026-05-31');
+  initDefaultRotates();
   RI=0; saveState();
   renderRotateChips('rotate-chips',RI,'selectRotate');
   renderTable(); renderFairness();
@@ -1497,16 +1507,30 @@ function clearAllData() {
 // ============================================================
 // INIT
 // ============================================================
+function initDefaultRotates() {
+  rotates = []; perRot = [];
+  // สร้าง 13 Rotate อัตโนมัติ เริ่ม 31 พ.ค. 2569
+  // Rotate 1 = 29 วัน, Rotate 2-13 = 28 วัน
+  let startStr = ROTATE_START;
+  for (let i = 0; i < TOTAL_ROTATES; i++) {
+    createRotate(startStr);
+    // คำนวณวันเริ่มต้น rotate ถัดไป
+    const start = new Date(startStr + 'T00:00:00');
+    start.setDate(start.getDate() + getRotateDays(i));
+    startStr = `${start.getFullYear()}-${String(start.getMonth()+1).padStart(2,'0')}-${String(start.getDate()).padStart(2,'0')}`;
+  }
+}
+
 (()=>{
   loadNameOverrides();
   loadSavedEmails();
-  const loaded=loadState();
-  if(!loaded || rotates.length===0){
-    createRotate('2026-05-31');
+  const loaded = loadState();
+  if (!loaded || rotates.length === 0) {
+    initDefaultRotates();
     saveState();
   }
-  RI=0;
-  renderRotateChips('rotate-chips',RI,'selectRotate');
+  RI = 0;
+  renderRotateChips('rotate-chips', RI, 'selectRotate');
   renderTable();
   renderFairness();
 })();
