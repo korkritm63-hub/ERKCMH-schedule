@@ -1,0 +1,2884 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>ER Resident Scheduler — จุฬาฯ v3</title>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+<!-- Firebase SDK -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, doc, setDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDaqkTFlH8X2HOI7AnTGI0jGduzek-YQIc",
+  authDomain: "ercu-scheduler.firebaseapp.com",
+  projectId: "ercu-scheduler",
+  storageBucket: "ercu-scheduler.firebasestorage.app",
+  messagingSenderId: "1092812580302",
+  appId: "1:1092812580302:web:402ac0104f38ca6662379f"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const SCHED_DOC = doc(db, 'scheduler', 'main');
+
+// ── Save to Firestore ─────────────────────────────────────────
+window._fbSave = async (rotatesData, perRotData) => {
+  try {
+    await setDoc(SCHED_DOC, { rotates: rotatesData, perRot: perRotData, updatedAt: Date.now() }, { merge: false });
+    return true;
+  } catch(e) { console.error('Firebase save error', e); return false; }
+};
+
+// ── Load from Firestore ───────────────────────────────────────
+window._fbLoad = async () => {
+  try {
+    const snap = await getDoc(SCHED_DOC);
+    if (snap.exists()) return snap.data();
+    return null;
+  } catch(e) { console.error('Firebase load error', e); return null; }
+};
+
+// ── Real-time listener — อัปเดตเมื่อคนอื่นแก้ไข ──────────────
+window._fbListen = (callback) => {
+  return onSnapshot(SCHED_DOC, (snap) => {
+    if (snap.exists()) callback(snap.data());
+  }, (e) => console.warn('Firebase listen error', e));
+};
+
+// Signal that Firebase is ready
+window._fbReady = true;
+window.dispatchEvent(new Event('firebase-ready'));
+</script>
+<style>
+:root{
+  --bg:#f0f4f8;--surface:#fff;--surface2:#f8fafc;
+  --border:#e2e8f0;--border2:#cbd5e1;
+  --text:#0f172a;--muted:#64748b;--light:#94a3b8;
+  --ok:#16a34a;--warn:#d97706;--err:#dc2626;--accent:#0ea5e9;
+  --rest:#f0fdf4;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);font-size:13px;-webkit-text-size-adjust:100%;}
+input,select,textarea{font-size:16px!important;} /* ป้องกัน iOS zoom เมื่อ focus input */
+
+header{background:#0f172a;color:#fff;padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:0 2px 10px rgba(0,0,0,.3);}
+.er-mark{width:32px;height:32px;background:#ef4444;border-radius:7px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:13px;}
+.logo-text{font-size:15px;font-weight:700;}
+.logo-sub{font-size:10px;color:#64748b;font-family:'IBM Plex Mono',monospace;}
+.nav-btn{padding:6px 14px;border-radius:6px;border:1px solid transparent;background:transparent;color:#94a3b8;cursor:pointer;font-family:'Sarabun',sans-serif;font-size:13px;transition:all .12s;}
+.nav-btn:hover{background:#1e293b;color:#fff;}
+.nav-btn.active{background:#ef4444;color:#fff;}
+.save-ind{font-size:11px;color:#64748b;font-family:'IBM Plex Mono',monospace;display:flex;align-items:center;gap:5px;}
+.save-dot{width:7px;height:7px;border-radius:50%;}
+
+.container{max-width:1600px;margin:0 auto;padding:20px 24px;}
+.tab-content{display:none;}.tab-content.active{display:block;}
+
+.toolbar{background:#fff;border:1px solid var(--border);border-radius:10px;padding:12px 20px;margin-bottom:16px;display:flex;align-items:center;gap:10px;box-shadow:0 1px 3px rgba(0,0,0,.05);flex-wrap:wrap;}
+.toolbar-left{flex:1;display:flex;align-items:center;gap:12px;min-width:200px;}
+.page-title{font-size:18px;font-weight:700;}
+.page-sub{font-size:10px;color:var(--muted);font-family:'IBM Plex Mono',monospace;}
+.btn{padding:7px 15px;border-radius:7px;border:none;cursor:pointer;font-family:'Sarabun',sans-serif;font-size:13px;font-weight:600;transition:all .12s;white-space:nowrap;display:flex;align-items:center;gap:5px;}
+.btn-red{background:#ef4444;color:#fff;}.btn-red:hover{background:#dc2626;}
+.btn-blue{background:var(--accent);color:#fff;}.btn-blue:hover{background:#0284c7;}
+.btn-green{background:#22c55e;color:#fff;}.btn-green:hover{background:#16a34a;}
+.btn-outline{background:#fff;color:var(--text);border:1px solid var(--border2);}.btn-outline:hover{border-color:var(--accent);color:var(--accent);}
+.btn-amber{background:#f59e0b;color:#fff;}.btn-amber:hover{background:#d97706;}
+.btn-sm{padding:5px 10px;font-size:12px;}
+
+/* ROTATE SELECTOR */
+.rotate-bar{background:#fff;border:1px solid var(--border);border-radius:10px;margin-bottom:16px;display:flex;align-items:center;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.05);}
+.rotate-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);padding:0 14px;white-space:nowrap;border-right:1px solid var(--border);height:44px;display:flex;align-items:center;background:var(--surface2);}
+.rotate-chips{display:flex;flex:1;overflow-x:auto;scrollbar-width:none;}  .rotate-chips::-webkit-scrollbar{display:none;}
+.rotate-chip{padding:0 14px;height:44px;border:none;border-right:1px solid var(--border);background:#fff;cursor:pointer;font-size:12px;font-weight:600;transition:all .12s;font-family:'IBM Plex Mono',monospace;color:var(--muted);white-space:nowrap;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;flex-shrink:0;}
+.rotate-chip:hover{background:#f0f9ff;color:var(--accent);}
+.rotate-chip.active{background:#fef2f2;color:#ef4444;border-bottom:3px solid #ef4444;}
+.rotate-chip .rc-dates{font-size:9px;font-weight:400;display:block;color:var(--muted);line-height:1;}
+.rotate-chip.active .rc-dates{color:#f87171;}
+.rot-edit-btn{font-size:11px;opacity:0;margin-left:3px;transition:opacity .15s;cursor:pointer;padding:0 2px;}
+.rotate-chip:hover .rot-edit-btn{opacity:1;}
+.rotate-chip.active .rot-edit-btn{opacity:0.7;}
+.add-rotate-btn{padding:0 14px;height:44px;border:none;border-left:1px solid var(--border);background:transparent;cursor:pointer;font-size:12px;color:var(--muted);transition:all .12s;font-family:'Sarabun',sans-serif;white-space:nowrap;flex-shrink:0;}
+.add-rotate-btn:hover{color:var(--accent);background:#f0f9ff;}
+
+/* STATS */
+.stats-row{display:grid;grid-template-columns:repeat(8,1fr);gap:8px;margin-bottom:16px;}
+.stat{background:#fff;border:1px solid var(--border);border-radius:10px;padding:10px 14px;box-shadow:0 1px 3px rgba(0,0,0,.04);}
+.stat-label{font-size:9px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:3px;}
+.stat-val{font-size:18px;font-weight:800;font-family:'IBM Plex Mono',monospace;}
+.stat-val.ok{color:var(--ok);}.stat-val.warn{color:var(--warn);}.stat-val.err{color:var(--err);}.stat-val.blue{color:var(--accent);}
+
+/* TABLE */
+.table-wrap{background:#fff;border:1px solid var(--border);border-radius:10px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.06);}
+.table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+table.sched{width:100%;border-collapse:collapse;}
+table.sched thead th{background:#1e293b;color:#e2e8f0;padding:10px 8px;font-size:11px;font-weight:600;text-align:center;border-right:1px solid #334155;white-space:nowrap;}
+th.col-date{text-align:left;padding-left:14px;min-width:130px;position:sticky;left:0;z-index:11;background:#1e293b;}
+th.col-M{min-width:185px;background:#78350f;border-left:3px solid #f59e0b;}
+th.col-A{min-width:185px;background:#1e3a8a;border-left:3px solid #3b82f6;}
+th.col-N{min-width:185px;background:#3b0764;border-left:3px solid #8b5cf6;}
+
+.day-row{border-bottom:2px solid var(--border);}
+.day-row:last-child{border-bottom:none;}
+.day-row td{vertical-align:top;}
+.date-cell{padding:9px 12px;border-right:1px solid var(--border);position:sticky;left:0;background:#fff;z-index:5;min-width:130px;}
+.day-row.weekend .date-cell{background:#fff5f5;}
+.day-row.holiday-row .date-cell{background:#fff7ed;}
+.day-row.tuesday-row .date-cell{background:#fffbeb;}
+.day-row.rest-day .date-cell{background:var(--rest);}
+.day-row.weekend .shift-cell,.day-row.holiday-row .shift-cell{background:#fffdf7;}
+.day-row.rest-day .shift-cell{background:#f7fef9;}
+.date-num{font-size:13px;font-weight:800;font-family:'IBM Plex Mono',monospace;line-height:1;}
+.date-full{font-size:12px;font-weight:600;font-family:'IBM Plex Mono',monospace;}
+.date-dow{font-size:11px;color:var(--muted);margin-top:2px;}
+.date-dow.we{color:#dc2626;font-weight:700;}
+.date-dow.tue{color:#b45309;font-weight:600;}
+.date-tags{margin-top:4px;display:flex;flex-direction:column;gap:2px;}
+.dtag{font-size:9px;padding:1px 5px;border-radius:3px;display:inline-block;width:fit-content;}
+.dtag-hol{background:#ffedd5;color:#c2410c;font-weight:700;}
+.dtag-tue{background:#fef3c7;color:#92400e;}
+.dtag-rest{background:#dcfce7;color:#166534;}
+.dtag-conf{background:#dbeafe;color:#1d4ed8;font-weight:700;border:1px solid #93c5fd;}
+
+/* Conference day row */
+.day-row.conf-day .date-cell{background:#eff6ff;border-left:3px solid #3b82f6;}
+.day-row.conf-day.weekend .date-cell{background:#e0f2fe;}
+
+/* Conference morning cell — stripe pattern to signal "max 3" */
+.conf-morning-cell{
+  background: repeating-linear-gradient(
+    135deg,
+    #fefce8,
+    #fefce8 8px,
+    #fef9c3 8px,
+    #fef9c3 16px
+  ) !important;
+  border-left: 3px solid #f59e0b !important;
+  position: relative;
+}
+.conf-morning-cell::after{
+  content: 'max 3';
+  position: absolute;
+  top: 4px; right: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  color: #b45309;
+  background: #fef3c7;
+  padding: 1px 5px;
+  border-radius: 3px;
+  border: 1px solid #fde68a;
+  pointer-events: none;
+}
+
+.shift-cell{padding:7px 9px;border-right:1px solid var(--border);vertical-align:top;min-width:185px;}
+.shift-cell:last-child{border-right:none;}
+.names-list{display:flex;flex-direction:column;gap:3px;min-height:24px;}
+.add-slot{display:flex;align-items:center;gap:4px;padding:3px 8px;border-radius:5px;font-size:11px;color:var(--light);cursor:pointer;border:1px dashed var(--border2);transition:all .1s;margin-top:3px;width:fit-content;}
+.add-slot:hover{border-color:var(--accent);color:var(--accent);background:#f0f9ff;}
+.shift-footer{display:flex;align-items:center;gap:3px;flex-wrap:wrap;margin-top:4px;padding-top:4px;border-top:1px solid var(--border);}
+.cnt-badge{font-size:10px;font-family:'IBM Plex Mono',monospace;font-weight:600;padding:1px 6px;border-radius:4px;}
+.cnt-ok{background:#dcfce7;color:var(--ok);}.cnt-warn{background:#fef9c3;color:var(--warn);}.cnt-err{background:#fee2e2;color:var(--err);}
+.flag{font-size:9px;padding:1px 4px;border-radius:3px;}
+.flag-err{background:#fee2e2;color:var(--err);}.flag-warn{background:#fef9c3;color:var(--warn);}
+.flag-purple{background:#f3e8ff;color:#9333ea;}.flag-green{background:#dcfce7;color:#166534;}
+
+.legend-bar{display:flex;gap:12px;padding:8px 16px;border-top:1px solid var(--border);background:var(--surface2);font-size:11px;flex-wrap:wrap;align-items:center;}
+.legend-item{display:flex;align-items:center;gap:5px;color:var(--muted);}
+.legend-dot{width:8px;height:8px;border-radius:2px;}
+
+/* MODAL */
+.overlay{display:none;position:fixed;inset:0;background:rgba(15,23,42,.55);backdrop-filter:blur(4px);z-index:200;align-items:center;justify-content:center;}
+.overlay.open{display:flex;}
+.modal{background:#fff;border-radius:14px;padding:24px;width:460px;max-height:88vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.25);}
+.modal h3{font-size:16px;font-weight:700;margin-bottom:4px;}
+.modal-sub{font-size:12px;color:var(--muted);margin-bottom:14px;}
+.info-box{padding:10px 12px;border-radius:8px;font-size:12px;margin-bottom:10px;}
+.info-box.yellow{background:#fffbeb;border:1px solid #fde68a;color:#92400e;}
+.info-box.purple{background:#faf5ff;border:1px solid #e9d5ff;color:#581c87;}
+.info-box.orange{background:#fff7ed;border:1px solid #fed7aa;color:#c2410c;}
+.picker-list{display:flex;flex-direction:column;gap:4px;max-height:320px;overflow-y:auto;}
+.pick-item{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-radius:8px;border:1px solid var(--border);cursor:pointer;transition:all .1s;}
+.pick-item:hover{border-color:var(--accent);background:#f0f9ff;}
+.pick-item.selected{border-color:#16a34a;background:#f0fdf4;}
+.pick-item.unavail{opacity:.4;pointer-events:none;background:var(--surface2);}
+.pick-name{font-weight:600;font-size:13px;}
+.pick-meta{font-size:11px;color:var(--muted);margin-top:1px;}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;}
+
+/* ADD ROTATE MODAL */
+.add-rotate-modal{width:380px;}
+.form-group{margin-bottom:14px;}
+.form-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);display:block;margin-bottom:5px;}
+.form-ctrl{width:100%;padding:8px 12px;border:1px solid var(--border2);border-radius:7px;font-family:'Sarabun',sans-serif;font-size:13px;background:var(--surface2);}
+.form-ctrl:focus{outline:none;border-color:var(--accent);background:#fff;}
+
+/* RESIDENTS */
+.res-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
+.yr-card{background:#fff;border:1px solid var(--border);border-radius:10px;overflow:hidden;}
+.yr-card-hd{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;}
+.res-row{padding:10px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.res-row:last-child{border-bottom:none;}
+.toggle{width:34px;height:18px;background:#e2e8f0;border-radius:9px;cursor:pointer;position:relative;transition:background .2s;flex-shrink:0;}
+.toggle.on{background:#22c55e;}
+.toggle::after{content:'';position:absolute;width:14px;height:14px;border-radius:50%;background:#fff;top:2px;left:2px;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.2);}
+.toggle.on::after{left:18px;}
+
+/* LEAVES */
+.lv-grid{display:grid;grid-template-columns:380px 1fr;gap:20px;}
+.lv-form{background:#fff;border:1px solid var(--border);border-radius:10px;padding:20px;}
+.lv-list-wrap{background:#fff;border:1px solid var(--border);border-radius:10px;overflow:hidden;}
+.lv-list-hd{padding:12px 16px;border-bottom:1px solid var(--border);font-weight:600;display:flex;justify-content:space-between;align-items:center;}
+.lv-entry{padding:11px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.lv-entry:last-child{border-bottom:none;}
+.lv-badge{font-size:10px;padding:2px 7px;border-radius:4px;font-weight:600;}
+.lv-LEAVE{background:#fee2e2;color:#dc2626;}.lv-AWAY{background:#f1f5f9;color:#475569;}
+.del-btn{background:none;border:none;color:var(--light);cursor:pointer;font-size:16px;padding:2px 6px;border-radius:4px;}
+.del-btn:hover{background:#fee2e2;color:#dc2626;}
+
+/* RESIDENT VIEW */
+.res-view{max-width:600px;margin:0 auto;}
+.quota-row{display:flex;gap:16px;background:#fff;border:1px solid var(--border);border-radius:10px;padding:16px 20px;margin-bottom:20px;}
+.q-item{text-align:center;}
+.q-num{font-size:26px;font-weight:800;font-family:'IBM Plex Mono',monospace;}
+.q-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;}
+.my-sched-list{background:#fff;border:1px solid var(--border);border-radius:10px;overflow:hidden;}
+.my-sched-row{padding:10px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;font-size:13px;}
+.my-sched-row:last-child{border-bottom:none;}
+.stag{font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;font-family:'IBM Plex Mono',monospace;}
+.stag-M{background:#fef3c7;color:#b45309;border:1px solid #fde68a;}
+.stag-A{background:#dbeafe;color:#1d4ed8;border:1px solid #bfdbfe;}
+.stag-N{background:#ede9fe;color:#6d28d9;border:1px solid #ddd6fe;}
+
+.toast{position:fixed;bottom:24px;right:24px;background:#1e293b;color:#fff;padding:11px 18px;border-radius:8px;font-size:13px;z-index:300;transform:translateY(50px);opacity:0;transition:all .22s;box-shadow:0 4px 16px rgba(0,0,0,.2);}
+.toast.show{transform:translateY(0);opacity:1;}
+.toast.ok{border-left:3px solid #22c55e;}.toast.err{border-left:3px solid #ef4444;}
+@keyframes slideUp{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
+
+/* ============================================================
+   MOBILE RESPONSIVE — iPhone Safari optimized
+   ============================================================ */
+@media (max-width: 768px) {
+
+  /* Header — compact */
+  header { padding: 0 12px; height: 50px; }
+  .logo-sub { display: none; }
+  .logo-text { font-size: 13px; }
+  .er-mark { width: 28px; height: 28px; font-size: 11px; }
+  .save-ind span { display: none; } /* แค่แสดง dot */
+
+  /* Nav buttons — smaller, scroll horizontally */
+  header > div:last-child { gap: 4px; overflow-x: auto; flex-wrap: nowrap; max-width: 60vw; }
+  .nav-btn { padding: 5px 10px; font-size: 12px; white-space: nowrap; }
+
+  /* Container — reduce padding */
+  .container { padding: 10px 12px; }
+
+  /* Toolbar — wrap nicely */
+  .toolbar { padding: 10px 12px; gap: 7px; }
+  .toolbar-left { min-width: 0; flex: 1 1 100%; }
+  .page-title { font-size: 15px; }
+
+  /* Buttons — bigger touch targets */
+  .btn { padding: 9px 14px; font-size: 13px; min-height: 40px; }
+  .btn-sm { padding: 7px 10px; font-size: 12px; min-height: 34px; }
+
+  /* Pattern badge */
+  #pattern-badge { font-size: 10px; padding: 3px 8px; }
+
+  /* Rotate chips — larger touch area */
+  .rotate-chip { height: 50px; padding: 0 12px; font-size: 12px; }
+  .add-rotate-btn { height: 50px; padding: 0 12px; font-size: 12px; }
+  .rot-edit-btn { opacity: 0.5; } /* always visible on mobile */
+
+  /* Conference bar — stack vertically */
+  .conf-inline-bar { flex-direction: column; align-items: stretch !important; }
+
+  /* Stats — 2 columns on mobile */
+  .stats-row { grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .stat { padding: 8px 10px; }
+  .stat-label { font-size: 8px; }
+  .stat-val { font-size: 16px; }
+
+  /* TABLE — key mobile optimizations */
+  .table-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch; /* momentum scroll iOS */
+    scroll-snap-type: x proximity;
+  }
+  table.sched { min-width: 560px; }
+
+  /* Date column — narrower on mobile */
+  th.col-date { min-width: 90px; }
+  .date-cell { min-width: 90px; padding: 7px 8px; }
+  .date-full { font-size: 11px; }
+  .date-dow { font-size: 10px; }
+
+  /* Shift columns — fit 3 across */
+  th.col-M, th.col-A, th.col-N { min-width: 140px; font-size: 10px; padding: 8px 6px; }
+  .shift-cell { min-width: 140px; padding: 5px 6px; }
+
+  /* Name chips — compact */
+  .names-list { gap: 2px; }
+  .add-slot { padding: 4px 8px; font-size: 11px; min-height: 30px; }
+
+  /* Shift footer badges */
+  .shift-footer { gap: 2px; padding-top: 3px; margin-top: 3px; }
+  .cnt-badge { font-size: 9px; padding: 1px 5px; }
+
+  /* Modal — full screen on mobile */
+  .modal {
+    width: 95vw !important;
+    max-height: 85vh;
+    padding: 18px 16px;
+    border-radius: 16px;
+  }
+  .picker-list { max-height: 50vh; }
+  .pick-item { padding: 11px 12px; min-height: 48px; } /* bigger touch */
+  .pick-name { font-size: 14px; }
+
+  /* Leave grid — stack vertically */
+  .lv-grid { grid-template-columns: 1fr; }
+
+  /* Residents grid — 1 column */
+  .res-grid { grid-template-columns: 1fr; }
+
+  /* Form controls — bigger */
+  .form-ctrl { padding: 10px 12px; font-size: 14px; min-height: 42px; }
+
+  /* Toggle — bigger */
+  .toggle { width: 40px; height: 22px; }
+  .toggle::after { width: 18px; height: 18px; }
+  .toggle.on::after { left: 20px; }
+
+  /* Overlay close area */
+  .overlay { align-items: flex-end; padding-bottom: 0; }
+  .overlay .modal { border-bottom-left-radius: 0; border-bottom-right-radius: 0; max-height: 92vh; }
+}
+
+/* Extra small — iPhone SE / narrow */
+@media (max-width: 390px) {
+  .stats-row { grid-template-columns: repeat(4, 1fr); }
+  th.col-M, th.col-A, th.col-N { min-width: 120px; }
+  .shift-cell { min-width: 120px; }
+  th.col-date { min-width: 80px; }
+  .date-cell { min-width: 80px; }
+  .nav-btn { padding: 5px 8px; font-size: 11px; }
+}
+/* RESIDENT MANAGEMENT */
+.res-mgmt-card{background:#fff;border:1px solid var(--border);border-radius:10px;overflow:hidden;}
+.res-mgmt-hd{padding:10px 14px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;}
+.res-item-row{display:flex;align-items:center;gap:6px;padding:6px 10px;border-bottom:1px solid var(--border);}
+.res-item-row:last-child{border-bottom:none;}
+.res-item-swatch{width:10px;height:10px;border-radius:2px;flex-shrink:0;}
+.res-item-input{flex:1;padding:4px 7px;border:1px solid var(--border2);border-radius:5px;font-family:"Sarabun",sans-serif;font-size:12px;background:#fff;}
+.res-item-input:focus{outline:none;border-color:var(--accent);}
+.res-item-del{background:none;border:none;cursor:pointer;color:var(--light);font-size:14px;padding:2px 4px;border-radius:4px;line-height:1;}
+.res-item-del:hover{background:#fee2e2;color:#dc2626;}
+.add-res-row{display:flex;align-items:center;gap:6px;padding:8px 10px;background:var(--surface2);border-top:1px solid var(--border);}
+
+/* CALENDAR PREVIEW (for PDF/export) */
+#cal-preview-wrap{display:none;}
+.cal-preview{font-family:"Sarabun",sans-serif;background:#fff;padding:0;}
+.cal-preview table{border-collapse:collapse;width:100%;font-size:11px;}
+.cal-preview th,.cal-preview td{border:1px solid #ccc;padding:3px 5px;text-align:center;vertical-align:middle;}
+.cal-preview th{background:#2563eb;color:#fff;font-weight:700;}
+.cal-preview th.hdr-M{background:#78350f;}
+.cal-preview th.hdr-A{background:#1e3a8a;}
+.cal-preview th.hdr-N{background:#3b0764;}
+.cal-preview td.date-td{background:#f8fafc;font-weight:700;font-size:10px;white-space:nowrap;}
+.cal-preview td.date-td.we{background:#fff5f5;color:#dc2626;}
+.cal-preview td.date-td.hol{background:#fff7ed;color:#c2410c;}
+.cal-name{display:inline-block;padding:1px 5px;border-radius:3px;margin:1px;font-size:10px;font-weight:600;white-space:nowrap;}
+
+
+/* WEIGHT SLIDERS */
+.w-slider-row{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;}
+.w-slider-label{display:flex;justify-content:space-between;align-items:center;font-size:13px;font-weight:600;margin-bottom:3px;}
+.w-val{font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;color:var(--accent);min-width:28px;text-align:right;}
+.w-slider-desc{font-size:11px;color:var(--muted);margin-bottom:8px;}
+.w-slider{width:100%;-webkit-appearance:none;height:5px;border-radius:3px;background:#e2e8f0;outline:none;cursor:pointer;}
+.w-slider::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:var(--accent);cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.2);}
+.w-slider::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:var(--accent);cursor:pointer;border:none;}
+.w-slider-marks{display:flex;justify-content:space-between;font-size:9px;color:var(--light);margin-top:3px;}
+
+/* SETTINGS */
+.name-edit-row{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;}
+.name-edit-swatch{width:12px;height:12px;border-radius:3px;flex-shrink:0;}
+.name-edit-label{font-size:11px;color:var(--muted);min-width:30px;font-family:'IBM Plex Mono',monospace;}
+.name-edit-input{flex:1;padding:5px 8px;border:1px solid var(--border2);border-radius:6px;font-family:'Sarabun',sans-serif;font-size:13px;background:#fff;}
+.name-edit-input:focus{outline:none;border-color:var(--accent);}
+.email-chip{display:flex;align-items:center;gap:6px;padding:5px 10px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:20px;font-size:12px;font-weight:600;color:#1e40af;cursor:pointer;transition:all .1s;}
+.email-chip:hover{background:#dbeafe;}
+.email-chip-rm{background:none;border:none;cursor:pointer;color:#93c5fd;font-size:13px;padding:0 2px;line-height:1;}
+.email-chip-rm:hover{color:#dc2626;}
+.capture-overlay{position:fixed;top:0;left:0;background:rgba(15,23,42,.7);color:#fff;font-size:14px;font-weight:600;z-index:999;display:flex;align-items:center;justify-content:center;gap:12px;}
+</style>
+</head>
+<body>
+
+
+<header>
+  <div style="display:flex;align-items:center;gap:12px">
+    <div class="er-mark">ER</div>
+    <div><div class="logo-text">Resident Scheduler</div><div class="logo-sub">KING CHULALONGKORN MEMORIAL HOSPITAL · 28-DAY ROTATE · v3</div></div>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <div class="save-ind" id="save-ind"><div class="save-dot" style="background:#22c55e"></div><span>บันทึกแล้ว</span></div>
+    <div style="display:flex;gap:5px">
+      <button class="nav-btn active" onclick="switchTab('schedule',this)">📅 ตาราง</button>
+      <button class="nav-btn" onclick="switchTab('residents',this)">👨‍⚕️ Residents</button>
+      <button class="nav-btn" onclick="switchTab('leaves',this)">📋 ขอลา</button>
+      <button class="nav-btn" onclick="switchTab('settings',this)">⚙️ ตั้งค่า</button>
+    </div>
+  </div>
+</header>
+
+<div class="container">
+
+<!-- SCHEDULE -->
+<div id="tab-schedule" class="tab-content active">
+  <div class="toolbar">
+    <div class="toolbar-left">
+      <div><div class="page-title" id="rot-title">Rotate 1</div><div class="page-sub" id="rot-sub">28 DAYS</div></div>
+      <div id="pattern-badge" style="padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;background:#e0f2fe;color:#0369a1;"></div>
+    </div>
+    <button class="btn btn-red" onclick="autoSchedule(true)" title="เติมเฉพาะช่องที่ยังขาด ไม่ล้างที่กรอกไว้">⚡ Fill ที่ขาด</button>
+    <button class="btn btn-amber" onclick="openWeightModal()" title="เลือก weight แล้วจัดใหม่ทั้งหมด">🔄 จัดใหม่ทั้งหมด</button>
+    <button class="btn btn-outline" onclick="undoSchedule()" id="btn-undo" title="Undo">↶ Undo</button>
+    <button class="btn btn-outline" onclick="redoSchedule()" id="btn-redo" title="Redo">↷ Redo</button>
+    <button class="btn btn-outline" onclick="clearSchedule()">🗑 ล้าง</button>
+    <button class="btn btn-blue" onclick="openSummaryPreview()">📋 Preview A4</button>
+  </div>
+
+  <!-- ROTATE SELECTOR -->
+  <div class="rotate-bar">
+    <span class="rotate-label">Rotate</span>
+    <div class="rotate-chips" id="rotate-chips"></div>
+    <button class="add-rotate-btn" onclick="openAddRotate()">＋ Add Rotate</button>
+  </div>
+
+  <!-- CONFERENCE DAYS (inline on schedule page) -->
+  <div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:10px 16px;margin-bottom:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;box-shadow:0 1px 3px rgba(0,0,0,.04);">
+    <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);white-space:nowrap;">📋 วันประชุม</span>
+    <div id="conf-chips-inline" style="display:flex;flex-wrap:wrap;gap:6px;flex:1;"></div>
+    <div style="display:flex;gap:6px;align-items:center;flex-shrink:0;">
+      <input type="date" class="form-ctrl" id="conf-date-inline" style="width:145px;padding:5px 8px;">
+      <select class="form-ctrl" id="conf-type-inline" style="width:150px;padding:5px 8px;">
+        <option value="IH">Interhospital</option>
+        <option value="Tox">Toxicology</option>
+        <option value="EMS">EMS</option>
+        <option value="Other">อื่นๆ</option>
+      </select>
+      <button class="btn btn-blue btn-sm" onclick="addConfDayInline()">+ เพิ่ม</button>
+    </div>
+  </div>
+
+  <div class="stats-row" id="stats-row"></div>
+  <div class="table-wrap">
+    <div class="table-scroll">
+      <table class="sched">
+        <thead><tr>
+          <th class="col-date">วันที่</th>
+          <th class="col-M">☀ เช้า 08:00–16:00</th>
+          <th class="col-A">🌆 บ่าย 16:00–24:00</th>
+          <th class="col-N">🌙 ดึก 00:00–08:00</th>
+        </tr></thead>
+        <tbody id="sched-body"></tbody>
+      </table>
+    </div>
+    <div class="legend-bar">
+      <span style="font-size:10px;font-weight:700;color:var(--muted)">LEGEND</span>
+      <div class="legend-item"><div class="legend-dot" style="background:#f59e0b"></div>วันหยุด 🌟</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#22c55e"></div>💤 พักหลังดึก</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#3b82f6"></div>📋 Conference (อังคาร + วันพิเศษ)</div>
+      <div class="legend-item"><div style="width:16px;height:8px;background:repeating-linear-gradient(135deg,#fefce8,#fefce8 4px,#fef9c3 4px,#fef9c3 8px);border-radius:2px;border:1px solid #fde68a;"></div>เช้า max 3</div>
+    </div>
+  </div>
+</div>
+
+<!-- RESIDENTS -->
+<div id="tab-residents" class="tab-content">
+  <div class="toolbar" style="margin-bottom:16px">
+    <div class="toolbar-left"><div class="page-title">Residents — <span id="res-rot-label">-</span></div></div>
+    <span style="font-size:12px;color:var(--muted)">Toggle ON/OFF · กดไอคอน <span style="font-size:14px">💪</span>ชอบ <span style="font-size:14px">➖</span>กลาง <span style="font-size:14px">🚫</span>ไม่ชอบ double shift</span>
+  </div>
+  <div class="res-grid" id="res-grid"></div>
+</div>
+
+<!-- LEAVES -->
+<div id="tab-leaves" class="tab-content">
+  <div class="toolbar" style="margin-bottom:16px">
+    <div class="toolbar-left"><div class="page-title">คำขอลา — <span id="lv-rot-label">-</span></div></div>
+  </div>
+  <div class="lv-grid">
+    <div class="lv-form">
+      <h3 style="font-size:15px;font-weight:700;margin-bottom:16px">เพิ่มคำขอลา</h3>
+      <div class="form-group"><label class="form-label">Resident</label><select class="form-ctrl" id="lv-res" onchange="updateQuotaDisplay()"></select></div>
+      <div class="form-group">
+        <label class="form-label">วันที่</label>
+        <input type="date" class="form-ctrl" id="lv-date">
+      </div>
+      <div class="form-group"><label class="form-label">ประเภท</label>
+        <select class="form-ctrl" id="lv-type">
+          <option value="LEAVE">🔴 ลาพักร้อน</option>
+          <option value="AWAY">⬛ งานอื่น / ติว / ธุระ</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">เวรที่ลา</label>
+        <div style="display:flex;gap:8px;">
+          <label style="display:flex;align-items:center;gap:5px;cursor:pointer;padding:6px 12px;border:1px solid var(--border2);border-radius:7px;font-size:13px;flex:1;justify-content:center;">
+            <input type="radio" name="lv-shift" value="ALL" checked onchange="updateLvShiftLabel()"> ทั้งวัน
+          </label>
+          <label style="display:flex;align-items:center;gap:5px;cursor:pointer;padding:6px 12px;border:1px solid #fde68a;border-radius:7px;font-size:13px;flex:1;justify-content:center;background:#fef9c3;">
+            <input type="radio" name="lv-shift" value="M" onchange="updateLvShiftLabel()"> ☀ เช้า
+          </label>
+          <label style="display:flex;align-items:center;gap:5px;cursor:pointer;padding:6px 12px;border:1px solid #bfdbfe;border-radius:7px;font-size:13px;flex:1;justify-content:center;background:#eff6ff;">
+            <input type="radio" name="lv-shift" value="A" onchange="updateLvShiftLabel()"> 🌆 บ่าย
+          </label>
+          <label style="display:flex;align-items:center;gap:5px;cursor:pointer;padding:6px 12px;border:1px solid #ddd6fe;border-radius:7px;font-size:13px;flex:1;justify-content:center;background:#f5f3ff;">
+            <input type="radio" name="lv-shift" value="N" onchange="updateLvShiftLabel()"> 🌙 ดึก
+          </label>
+        </div>
+        <div id="lv-shift-note" style="font-size:11px;color:var(--muted);margin-top:5px;"></div>
+      </div>
+      <div class="form-group"><label class="form-label">หมายเหตุ</label><input type="text" class="form-ctrl" id="lv-note" placeholder="เช่น ติวบอร์ด..."></div>
+      <div id="quota-display" style="font-size:12px;color:var(--muted);margin-bottom:12px;padding:8px 12px;background:var(--surface2);border-radius:7px;border:1px solid var(--border)"></div>
+      <button class="btn btn-red" style="width:100%" onclick="addLeave()">+ เพิ่มคำขอ</button>
+    </div>
+    <div class="lv-list-wrap">
+      <div class="lv-list-hd">รายการขอลา <span id="lv-cnt" style="background:#fee2e2;color:#dc2626;font-size:11px;padding:2px 9px;border-radius:10px;font-family:monospace">0</span></div>
+      <div id="lv-entries"></div>
+    </div>
+  </div>
+</div>
+
+<!-- SETTINGS -->
+<div id="tab-settings" class="tab-content">
+  <div class="toolbar" style="margin-bottom:16px">
+    <div class="toolbar-left"><div class="page-title">⚙️ ตั้งค่าระบบ</div></div>
+  </div>
+
+  <!-- MANAGE RESIDENTS -->
+  <div style="background:#fff;border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:20px;">
+    <div style="padding:14px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+      <div style="font-weight:700;font-size:14px">👨‍⚕️ จัดการ Residents (เพิ่ม/ลบ/แก้ชื่อ)</div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-green btn-sm" onclick="saveResidentNames()">💾 บันทึกทั้งหมด</button>
+      </div>
+    </div>
+    <div style="padding:16px 20px;">
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;" id="res-manage-grid"></div>
+    </div>
+  </div>
+
+  <!-- EXPORT (Preview A4) -->
+  <div style="background:#fff;border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:20px;">
+    <div style="padding:14px 20px;border-bottom:1px solid var(--border);font-weight:700;font-size:14px">📋 Export สรุปตารางเวร A4</div>
+    <div style="padding:20px;display:flex;gap:16px;align-items:center;">
+      <div style="font-size:40px">📅</div>
+      <div style="flex:1">
+        <div style="font-weight:700;font-size:14px;margin-bottom:4px">Preview สรุปแบบ A4</div>
+        <div style="font-size:12px;color:var(--muted);">สรุปตารางเวรทั้ง Rotate ในหน้าเดียว — Download เป็นรูป JPEG หรือ Print เป็น PDF ได้</div>
+      </div>
+      <button class="btn btn-blue" onclick="openSummaryPreview()">📋 เปิด Preview</button>
+    </div>
+  </div>
+
+  <!-- YEAR PROMOTION -->
+  <div style="background:#fff;border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:20px;">
+    <div style="padding:14px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+      <div>
+        <div style="font-weight:700;font-size:14px">🎓 เลื่อนชั้นปี (Year Promotion)</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px">R3 จบ → R2 เลื่อนเป็น R3 → R1 เลื่อนเป็น R2 → เพิ่ม R1 ใหม่</div>
+      </div>
+      <button class="btn btn-amber" onclick="openPromoteModal()">🎓 เลื่อนชั้นปี...</button>
+    </div>
+    <div style="padding:12px 20px;font-size:12px;color:var(--muted);background:var(--surface2);">
+      ⚠️ ชื่อและข้อมูลเวรเก่าจะยังคงอยู่ เพียงเปลี่ยนหมายเลขชั้นปีเท่านั้น — แนะนำให้ทำก่อนสร้าง Rotate ใหม่
+    </div>
+  </div>
+
+  <!-- DANGER ZONE -->
+  <div style="background:#fff;border:1px solid #fecaca;border-radius:10px;overflow:hidden;">
+    <div style="padding:14px 20px;border-bottom:1px solid #fecaca;font-weight:700;font-size:14px;color:#dc2626">⚠️ Danger Zone</div>
+    <div style="padding:16px 20px;display:flex;gap:12px;align-items:center;">
+      <button class="btn btn-outline" style="border-color:#fca5a5;color:#dc2626" onclick="clearAllData()">🗑 ล้างข้อมูลทั้งหมด (reset)</button>
+      <span style="font-size:12px;color:var(--muted)">ลบตาราง, คำขอลา, และรอบทั้งหมด กลับเป็นค่าเริ่มต้น</span>
+    </div>
+  </div>
+</div>
+
+</div><!-- /container -->
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <h3 id="modal-h"></h3><div class="modal-sub" id="modal-sub"></div>
+    <div id="modal-infos"></div>
+    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px">เลือก Resident</div>
+    <div class="picker-list" id="modal-picker"></div>
+    <div class="modal-actions"><button class="btn btn-outline" onclick="closeModal()">ปิด</button></div>
+  </div>
+</div>
+
+<!-- ROTATE MANAGE MODAL -->
+<div class="overlay" id="add-rot-overlay">
+  <div class="modal" style="width:460px">
+    <h3 id="rot-modal-title">➕ เพิ่ม Rotate ใหม่</h3>
+    <div class="modal-sub" id="add-rot-sub"></div>
+    <div style="margin-top:14px;display:flex;flex-direction:column;gap:12px;">
+      <div class="form-group" style="margin-bottom:0">
+        <label class="form-label">ชื่อ Rotate</label>
+        <input type="text" class="form-ctrl" id="new-rot-name" placeholder="เช่น Rotate 1">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">วันเริ่มต้น</label>
+          <input type="date" class="form-ctrl" id="new-rot-start" oninput="updateRotPreview()">
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">วันสุดท้าย</label>
+          <input type="date" class="form-ctrl" id="new-rot-end" oninput="updateRotPreview()">
+        </div>
+      </div>
+      <div id="new-rot-preview" style="font-size:12px;color:var(--muted);padding:8px 12px;background:var(--surface2);border-radius:7px;min-height:32px;"></div>
+    </div>
+    <div class="modal-actions" style="margin-top:20px;justify-content:space-between;">
+      <div id="rot-modal-del-btn"></div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-outline" onclick="closeAddRotate()">ยกเลิก</button>
+        <button class="btn btn-red" id="rot-modal-confirm-btn" onclick="confirmRotModal()">+ เพิ่ม Rotate</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SUMMARY PREVIEW MODAL -->
+<div class="overlay" id="preview-overlay">
+  <div style="background:#f1f5f9;width:96vw;max-width:1200px;height:92vh;border-radius:14px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.25);">
+    <div style="padding:14px 20px;background:#1e293b;color:#fff;display:flex;justify-content:space-between;align-items:center;">
+      <div>
+        <div style="font-weight:700;font-size:15px">📋 Preview สรุปตารางเวร A4</div>
+        <div style="font-size:11px;color:#94a3b8;margin-top:2px" id="prev-rot-info"></div>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-green" onclick="downloadPreviewJPEG()">📸 Download JPEG</button>
+        <button class="btn btn-blue" onclick="printPreview()">🖨 Print / PDF</button>
+        <button class="btn btn-outline" style="background:#fff" onclick="closeSummaryPreview()">✕ ปิด</button>
+      </div>
+    </div>
+    <div style="flex:1;overflow:auto;padding:24px;display:flex;justify-content:center;">
+      <div id="preview-paper" style="background:#fff;width:1123px;min-height:794px;padding:18px 22px;box-shadow:0 4px 16px rgba(0,0,0,.15);font-family:'Sarabun',sans-serif;color:#0f172a;">
+        <!-- generated content -->
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PROMOTE MODAL -->
+<div class="overlay" id="promote-overlay">
+  <div class="modal" style="width:520px">
+    <h3>🎓 เลื่อนชั้นปี</h3>
+    <div class="modal-sub">ตรวจสอบก่อนยืนยัน</div>
+
+    <div style="margin:14px 0;display:flex;flex-direction:column;gap:8px;">
+      <!-- R3 จบ -->
+      <div style="padding:12px 14px;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;">
+        <div style="font-weight:700;font-size:13px;color:#dc2626;margin-bottom:6px;">🎓 R3 จบการศึกษา (จะถูกลบออก)</div>
+        <div id="promote-r3-list" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+      </div>
+      <!-- R2 → R3 -->
+      <div style="padding:12px 14px;background:#faf5ff;border:1px solid #e9d5ff;border-radius:8px;">
+        <div style="font-weight:700;font-size:13px;color:#9333ea;margin-bottom:6px;">⬆️ R2 → R3</div>
+        <div id="promote-r2-list" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+      </div>
+      <!-- R1 → R2 -->
+      <div style="padding:12px 14px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;">
+        <div style="font-weight:700;font-size:13px;color:#2563eb;margin-bottom:6px;">⬆️ R1 → R2</div>
+        <div id="promote-r1-list" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+      </div>
+      <!-- R1 ใหม่ -->
+      <div style="padding:12px 14px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;">
+        <div style="font-weight:700;font-size:13px;color:#16a34a;margin-bottom:8px;">➕ เพิ่ม R1 ใหม่</div>
+        <div id="promote-new-r1" style="display:flex;flex-direction:column;gap:6px;"></div>
+        <button class="btn btn-outline btn-sm" style="margin-top:8px;border-color:#bbf7d0;color:#16a34a" onclick="addNewR1Row()">+ เพิ่มชื่อ R1 ใหม่</button>
+      </div>
+    </div>
+
+    <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px 12px;font-size:12px;color:#92400e;margin-bottom:14px;">
+      💡 ข้อมูลเวรใน Rotate ที่ผ่านมาจะยังคงอยู่ครบถ้วน การเปลี่ยนแปลงนี้จะมีผลกับ Rotate ถัดไปเท่านั้น
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closePromoteModal()">ยกเลิก</button>
+      <button class="btn btn-amber" onclick="confirmPromotion()">✅ ยืนยันเลื่อนชั้นปี</button>
+    </div>
+  </div>
+</div>
+
+<!-- WEIGHT MODAL -->
+<div class="overlay" id="weight-overlay">
+  <div class="modal" style="width:480px">
+    <h3>🔄 จัดใหม่ทั้งหมด</h3>
+    <div class="modal-sub">ปรับ weight ของแต่ละเงื่อนไข แล้วกด "จัดตาราง"</div>
+
+    <div style="display:flex;flex-direction:column;gap:14px;margin:16px 0;">
+
+      <div class="w-slider-row">
+        <div class="w-slider-label">
+          <span>🌙 Night balance</span>
+          <span class="w-val" id="wv-night">20</span>
+        </div>
+        <div class="w-slider-desc">กระจายเวรดึกให้แต่ละคนในปีเดียวกันเท่ากัน</div>
+        <input type="range" class="w-slider" id="ws-night" min="0" max="40" value="20" oninput="document.getElementById('wv-night').textContent=this.value">
+        <div class="w-slider-marks"><span>ปล่อย</span><span>ปกติ</span><span>เข้มมาก</span></div>
+      </div>
+
+      <div class="w-slider-row">
+        <div class="w-slider-label">
+          <span>⚖️ Type balance (M/A/N ต่อคน)</span>
+          <span class="w-val" id="wv-type">6</span>
+        </div>
+        <div class="w-slider-desc">กระจาย M/A/N ของแต่ละคนในปีเดียวกัน</div>
+        <input type="range" class="w-slider" id="ws-type" min="0" max="20" value="6" oninput="document.getElementById('wv-type').textContent=this.value">
+        <div class="w-slider-marks"><span>ปล่อย</span><span>ปกติ</span><span>เข้มมาก</span></div>
+      </div>
+
+      <div class="w-slider-row">
+        <div class="w-slider-label">
+          <span>🌟 Weekend balance</span>
+          <span class="w-val" id="wv-wknd">8</span>
+        </div>
+        <div class="w-slider-desc">กระจายเวรวันหยุดให้ทุกคนพอๆ กัน</div>
+        <input type="range" class="w-slider" id="ws-wknd" min="0" max="20" value="8" oninput="document.getElementById('wv-wknd').textContent=this.value">
+        <div class="w-slider-marks"><span>ปล่อย</span><span>ปกติ</span><span>เข้มมาก</span></div>
+      </div>
+
+      <div class="w-slider-row">
+        <div class="w-slider-label">
+          <span>🔀 Double shift penalty</span>
+          <span class="w-val" id="wv-double">15</span>
+        </div>
+        <div class="w-slider-desc">ยิ่งสูง = หลีกเลี่ยง เช้า+บ่าย มากขึ้น</div>
+        <input type="range" class="w-slider" id="ws-double" min="0" max="50" value="15" oninput="document.getElementById('wv-double').textContent=this.value">
+        <div class="w-slider-marks"><span>ยอมรับ</span><span>ปกติ</span><span>หลีกเลี่ยง</span></div>
+      </div>
+
+      <div class="w-slider-row">
+        <div class="w-slider-label">
+          <span>😴 No long rest (หยุดติดต่อกัน)</span>
+          <span class="w-val" id="wv-rest">30</span>
+        </div>
+        <div class="w-slider-desc">ยิ่งสูง = จัดเวรให้คนที่หยุดมานาน > 5 วัน</div>
+        <input type="range" class="w-slider" id="ws-rest" min="0" max="60" value="30" oninput="document.getElementById('wv-rest').textContent=this.value">
+        <div class="w-slider-marks"><span>ปล่อย</span><span>ปกติ</span><span>เข้มมาก</span></div>
+      </div>
+
+      <div class="w-slider-row">
+        <div class="w-slider-label">
+          <span>🏥 Night clustering (ดึกติดกัน)</span>
+          <span class="w-val" id="wv-cluster">15</span>
+        </div>
+        <div class="w-slider-desc">ยิ่งสูง = จัดดึกติดกัน 2-3 คืนมากขึ้น</div>
+        <input type="range" class="w-slider" id="ws-cluster" min="0" max="30" value="15" oninput="document.getElementById('wv-cluster').textContent=this.value">
+        <div class="w-slider-marks"><span>กระจาย</span><span>ปกติ</span><span>ติดกัน</span></div>
+      </div>
+
+    </div>
+
+    <!-- Presets -->
+    <div style="margin-bottom:14px;">
+      <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Presets</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-outline btn-sm" onclick="applyPreset('default')">⚙️ ค่าเริ่มต้น</button>
+        <button class="btn btn-outline btn-sm" onclick="applyPreset('night')">🌙 เน้น Night balance</button>
+        <button class="btn btn-outline btn-sm" onclick="applyPreset('spread')">⚖️ เน้น กระจาย M/A/N</button>
+        <button class="btn btn-outline btn-sm" onclick="applyPreset('weekend')">🌟 เน้น Weekend</button>
+        <button class="btn btn-outline btn-sm" onclick="applyPreset('loose')">🔓 ผ่อนปรน</button>
+      </div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeWeightModal()">ยกเลิก</button>
+      <button class="btn btn-amber" onclick="confirmWeightSchedule()">🔄 จัดตาราง</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+
+
+<script>
+// ============================================================
+// CORE: 28-day rotate periods
+// ============================================================
+const ROTATE_DAYS = 28;
+const TOTAL_ROTATES = 13;
+const ROTATE_START = '2026-06-29';
+const QUOTA = {1:22, 2:22, 3:20};
+
+// Rotate 1 = 29 วัน, Rotate 2-13 = 28 วัน
+function getRotateDays(idx) { return (idx % TOTAL_ROTATES) === 12 ? 29 : 28; }
+function rotDays(ri) { return rotates[ri]?.days || getRotateDays(ri); }
+const SHIFTS = ['M','A','N'];
+const SNAME = {M:'เช้า',A:'บ่าย',N:'ดึก'};
+const STIME = {M:'08:00–16:00',A:'16:00–24:00',N:'00:00–08:00'};
+const DOW_TH = ['อา','จ','อ','พ','พฤ','ศ','ส'];
+const DOW_FULL = ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'];
+const TH_MONTHS = ['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+const TH_MONTHS_FULL = ['','มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+
+// Generate rotate periods starting from a date
+// Each period: startDate, endDate (28 days)
+function makeRotate(startDateStr, idx, endDateStr=null, customLabel=null) {
+  const start = new Date(startDateStr + 'T00:00:00');
+  let end;
+  if (endDateStr) {
+    end = new Date(endDateStr + 'T00:00:00');
+  } else {
+    const days = getRotateDays(idx);
+    end = new Date(start);
+    end.setDate(end.getDate() + days - 1);
+  }
+  const days = Math.round((end - start)/(1000*60*60*24)) + 1;
+  const fmt = d => `${d.getDate()} ${TH_MONTHS[d.getMonth()+1]} ${d.getFullYear()+543}`;
+  const fmtShort = d => `${d.getDate()}/${d.getMonth()+1}`;
+  const rotNum = (idx % TOTAL_ROTATES) + 1;
+  const label = customLabel || `Rotate ${rotNum}`;
+  return {
+    idx, startStr: startDateStr,
+    endStr: endDateStr || null,
+    customLabel: customLabel || null,
+    days,
+    label,
+    dateRange: `${fmt(start)} – ${fmt(end)}`,
+    shortRange: `${fmtShort(start)}–${fmtShort(end)}`,
+    startDate: start,
+    endDate: end,
+  };
+}
+
+// ============================================================
+// RESIDENT DATA
+// ============================================================
+const RES = [
+  {id:'r1',  name:'ก่อกฤษฎิ์',    year:3, pin:'3001', color:'#c2410c', bg:'#fff7ed', border:'#fed7aa'},
+  {id:'r2',  name:'ชนากานต์',     year:3, pin:'3002', color:'#9f1239', bg:'#fff1f2', border:'#fecdd3'},
+  {id:'r3',  name:'ณัฐนนท์',     year:3, pin:'3003', color:'#92400e', bg:'#fef3c7', border:'#fde68a'},
+  {id:'r4',  name:'นภัทร',       year:3, pin:'3004', color:'#7c2d12', bg:'#ffedd5', border:'#fdba74'},
+  {id:'r5',  name:'ประภาศิริ',    year:3, pin:'3005', color:'#881337', bg:'#fce7f3', border:'#fbcfe8'},
+  {id:'r6',  name:'วิทยา',       year:3, pin:'3006', color:'#713f12', bg:'#fefce8', border:'#fef08a'},
+  {id:'r7',  name:'ศุภวิชญ์',    year:3, pin:'3007', color:'#991b1b', bg:'#fee2e2', border:'#fca5a5'},
+  {id:'r8',  name:'สวิตต์',      year:3, pin:'3008', color:'#86198f', bg:'#fdf4ff', border:'#f0abfc'},
+  {id:'r9',  name:'ชานน',        year:2, pin:'2001', color:'#1e40af', bg:'#eff6ff', border:'#bfdbfe'},
+  {id:'r10', name:'ญาดา',        year:2, pin:'2002', color:'#0e7490', bg:'#ecfeff', border:'#a5f3fc'},
+  {id:'r11', name:'เตชินท์',     year:2, pin:'2003', color:'#1d4ed8', bg:'#dbeafe', border:'#93c5fd'},
+  {id:'r12', name:'เปรมสุพัฒนี', year:2, pin:'2004', color:'#0f766e', bg:'#f0fdfa', border:'#99f6e4'},
+  {id:'r13', name:'พิชชาพร',     year:2, pin:'2005', color:'#3730a3', bg:'#eef2ff', border:'#c7d2fe'},
+  {id:'r14', name:'แพรวา',       year:2, pin:'2006', color:'#6b21a8', bg:'#f5f3ff', border:'#ddd6fe'},
+  {id:'r15', name:'มณิภา',       year:2, pin:'2007', color:'#1e3a8a', bg:'#e0f2fe', border:'#7dd3fc'},
+  {id:'r16', name:'ลภน',         year:2, pin:'2008', color:'#065f46', bg:'#d1fae5', border:'#6ee7b7'},
+  {id:'r17', name:'ชานูซี',      year:1, pin:'1001', color:'#166534', bg:'#f0fdf4', border:'#bbf7d0'},
+  {id:'r18', name:'ธนกฤต',      year:1, pin:'1002', color:'#3f6212', bg:'#f7fee7', border:'#d9f99d'},
+  {id:'r19', name:'ปวรสุข',      year:1, pin:'1003', color:'#14532d', bg:'#dcfce7', border:'#86efac'},
+  {id:'r20', name:'หฤษฎ์',       year:1, pin:'1004', color:'#365314', bg:'#fefce8', border:'#fef08a'},
+  {id:'r21', name:'ศิรวิชญ์',    year:1, pin:'1005', color:'#1a3a1a', bg:'#f0fdf4', border:'#4ade80'},
+  {id:'r22', name:'ปัทมพร',      year:1, pin:'1006', color:'#4d7c0f', bg:'#ecfccb', border:'#bef264'},
+  {id:'r23', name:'พรปัญญา',     year:1, pin:'1007', color:'#15803d', bg:'#d1fae5', border:'#34d399'},
+  {id:'r24', name:'นีรนารา',     year:1, pin:'1008', color:'#064e3b', bg:'#ccfbf1', border:'#5eead4'},
+  {id:'r25', name:'นิชาภา',       year:1, pin:'1009', color:'#365314', bg:'#ecfccb', border:'#a3e635'},
+];
+
+// ============================================================
+// STATE — indexed by rotate period index (ri)
+// ============================================================
+// rotates: [{idx, startStr, label, dateRange, startDate, endDate}]
+// perRot[ri].active = {rid: bool}
+// perRot[ri].sched[day1..28] = {M:[],A:[],N:[]}  (day is 1-28)
+// perRot[ri].lvs = [{residentId, date:'YYYY-MM-DD', type, note}]
+// perRot[ri].holidays = [{date:'YYYY-MM-DD', name}]
+
+let rotates = [];
+let perRot = [];
+let RI = 0; // current rotate index
+
+// Helpers to get actual calendar date from rotate day index
+function rotDay(ri, d) {
+  // d = 1..28, returns Date object
+  const r = rotates[ri];
+  const dt = new Date(r.startDate);
+  dt.setDate(dt.getDate() + d - 1);
+  return dt;
+}
+function rotDayStr(ri, d) {
+  const dt = rotDay(ri, d);
+  return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+}
+function dowOfDay(ri, d) { return rotDay(ri, d).getDay(); }
+const isTue = (ri, d) => dowOfDay(ri, d) === 2;
+const isWeekend = (ri, d) => { const w=dowOfDay(ri,d); return w===0||w===6; };
+const isHoliday = (ri, d) => {
+  const ds = rotDayStr(ri, d);
+  return perRot[ri].holidays.some(h => h.date === ds);
+};
+const isSpecialDay = (ri, d) => isWeekend(ri,d) || isHoliday(ri,d);
+const holName = (ri, d) => { const ds=rotDayStr(ri,d); const h=perRot[ri].holidays.find(x=>x.date===ds); return h?h.name:null; };
+function displayName(r) { return `R${r.year} ${r.name}`; }
+const getR = id => RES.find(r=>r.id===id);
+function activeRes(ri) { return RES.filter(r => perRot[ri].active[r.id] !== false); }
+
+function formatDate(dt) {
+  return `${dt.getDate()} ${TH_MONTHS[dt.getMonth()+1]} ${dt.getFullYear()+543}`;
+}
+
+// ============================================================
+// INIT ROTATE
+// ============================================================
+function createRotate(startStr, endStr=null, customLabel=null) {
+  const ri = rotates.length;
+  const rot = makeRotate(startStr, ri, endStr, customLabel);
+  rotates.push(rot);
+  perRot.push({
+    active: Object.fromEntries(RES.map(r=>[r.id, true])),
+    sched: Object.fromEntries(Array.from({length:rot.days},(_,i)=>[i+1,{M:[],A:[],N:[]}])),
+    specialBlocks: [], // reserved
+    confDays: [], // [{date:'YYYY-MM-DD', type:'IH'|'Tox'|'EMS'}]
+    lvs: [],
+    holidays: [],
+  });
+  return ri;
+}
+
+function nextRotateStart(ri) {
+  const end = rotates[ri].endDate;
+  const next = new Date(end);
+  next.setDate(next.getDate() + 1);
+  return `${next.getFullYear()}-${String(next.getMonth()+1).padStart(2,'0')}-${String(next.getDate()).padStart(2,'0')}`;
+}
+
+// ============================================================
+// PERSISTENCE
+// ============================================================
+// ── Save: localStorage (instant) + Firestore (async sync) ────
+let _fbSaveTimer = null;
+function saveState() {
+  try {
+    localStorage.setItem('er28_rotates', JSON.stringify(rotates.map(r=>r.startStr)));
+    localStorage.setItem('er28_perRot', JSON.stringify(perRot));
+    setSaveInd(false); // show "กำลังบันทึก..."
+    // Debounce Firestore save — wait 800ms after last change
+    clearTimeout(_fbSaveTimer);
+    _fbSaveTimer = setTimeout(async () => {
+      if (window._fbReady && window._fbSave) {
+        const ok = await window._fbSave(
+          rotates.map(r=>r.startStr),
+          JSON.parse(JSON.stringify(perRot)) // deep clone
+        );
+        setSaveInd(ok);
+        if (!ok) showToast('⚠ Cloud save ล้มเหลว (บันทึกเฉพาะ local)','err');
+      } else {
+        setSaveInd(true); // Firebase not ready, local only
+      }
+    }, 800);
+  } catch(e) { console.warn('save failed',e); }
+}
+
+function loadState() {
+  try {
+    const rs = localStorage.getItem('er28_rotates');
+    const pr = localStorage.getItem('er28_perRot');
+    if (rs && pr) {
+      const startStrs = JSON.parse(rs);
+      rotates = [];
+      startStrs.forEach((s,i) => rotates.push(makeRotate(s,i)));
+      const rawPerRot = JSON.parse(pr);
+      perRot = rawPerRot.map(pr => ({
+        ...pr,
+        lvs: pr.lvs ?? [],
+        holidays: pr.holidays ?? [],
+        confDays: pr.confDays ?? [],
+        specialBlocks: pr.specialBlocks ?? [],
+        active: pr.active ?? {},
+        sched: pr.sched ?? {},
+      }));
+      rotates.forEach((r,i) => {
+        r.startDate = new Date(r.startStr+'T00:00:00');
+        r.endDate = new Date(r.startDate);
+        if(r.endStr){
+          r.endDate=new Date(r.endStr+'T00:00:00');
+        }else{
+          r.endDate.setDate(r.endDate.getDate()+getRotateDays(i)-1);
+        }
+        r.days=Math.round((r.endDate-r.startDate)/(1000*60*60*24))+1;
+        const fmt2=d=>`${d.getDate()} ${TH_MONTHS[d.getMonth()+1]} ${d.getFullYear()+543}`;
+        const fmts=d=>`${d.getDate()}/${d.getMonth()+1}`;
+        r.dateRange=`${fmt2(r.startDate)} – ${fmt2(r.endDate)}`;
+        r.shortRange=`${fmts(r.startDate)}–${fmts(r.endDate)}`;
+        const rotNum=(i%TOTAL_ROTATES)+1;
+        r.label=r.customLabel||`Rotate ${rotNum}`;
+      });
+      return true;
+    }
+  } catch(e) { console.warn('load failed',e); }
+  return false;
+}
+
+// ── Apply data from Firestore/Cloud ──────────────────────────
+function applyCloudData(data) {
+  if (!data?.rotates || !data?.perRot) return;
+  try {
+    // เทียบ timestamp — ถ้า cloud ใหม่กว่า local ให้ใช้ cloud
+    const localTs = parseInt(localStorage.getItem('er28_ts')||'0');
+    if (data.updatedAt && data.updatedAt <= localTs) return; // local is newer
+    localStorage.setItem('er28_rotates', JSON.stringify(data.rotates));
+    localStorage.setItem('er28_perRot', JSON.stringify(data.perRot));
+    localStorage.setItem('er28_ts', String(data.updatedAt||Date.now()));
+    loadState();
+    renderRotateChips('rotate-chips', RI, 'selectRotate');
+    renderTable();
+    setSaveInd(true);
+    showToast('☁️ โหลดข้อมูลล่าสุดจาก Cloud แล้ว','ok');
+  } catch(e) { console.warn('applyCloudData error',e); }
+}
+
+// ── Load from Firestore on startup ───────────────────────────
+async function loadFromCloud() {
+  if (!window._fbReady || !window._fbLoad) return;
+  setSaveInd(false);
+  const data = await window._fbLoad();
+  if (data) {
+    applyCloudData(data);
+  }
+  setSaveInd(true);
+  // Start real-time listener for collaborative editing
+  if (window._fbListen) {
+    window._fbListen((data) => {
+      const localTs = parseInt(localStorage.getItem('er28_ts')||'0');
+      if (data.updatedAt && data.updatedAt > localTs) {
+        applyCloudData(data);
+      }
+    });
+  }
+}
+
+function setSaveInd(ok) {
+  const el = document.getElementById('save-ind');
+  if (!el) return;
+  if (ok === false) {
+    el.innerHTML = '<div class="save-dot" style="background:#f59e0b"></div><span>กำลังบันทึก...</span>';
+  } else if (ok === true) {
+    el.innerHTML = '<div class="save-dot" style="background:#22c55e"></div><span>☁️ บันทึกแล้ว</span>';
+  }
+}
+
+// ============================================================
+// HELPERS
+// ============================================================
+function isUnavail(rid,ri,d) {
+  const ds = rotDayStr(ri,d);
+  // Unavailable if has ALL-day leave, or no shift-specific leave (returns false so they can still do other shifts)
+  return perRot[ri].lvs.some(l=>l.residentId===rid&&l.date===ds&&(!l.shift||l.shift==='ALL'));
+}
+// Check if unavailable for specific shift
+function isUnavailForShift(rid,ri,d,shift) {
+  const ds = rotDayStr(ri,d);
+  return perRot[ri].lvs.some(l=>{
+    if(l.residentId!==rid||l.date!==ds) return false;
+    if(!l.shift||l.shift==='ALL') return true; // all-day leave
+    return l.shift===shift; // shift-specific leave
+  });
+}
+function lvTypeOf(rid,ri,d) {
+  const ds=rotDayStr(ri,d);
+  const l=perRot[ri].lvs.find(l=>l.residentId===rid&&l.date===ds&&(!l.shift||l.shift==='ALL'));
+  return l?l.type:null;
+}
+function lvShiftLeaves(rid,ri,d) {
+  // Return array of shift-specific leaves [{shift, type}]
+  const ds=rotDayStr(ri,d);
+  return perRot[ri].lvs.filter(l=>l.residentId===rid&&l.date===ds&&l.shift&&l.shift!=='ALL');
+}
+function shiftCntByType(rid,ri) {
+  let M=0,A=0,N=0;
+  for(let d=1;d<=rotDays(ri);d++){
+    if((perRot[ri].sched[d]?.M||[]).includes(rid)) M++;
+    if((perRot[ri].sched[d]?.A||[]).includes(rid)) A++;
+    if((perRot[ri].sched[d]?.N||[]).includes(rid)) N++;
+  }
+  return {M,A,N,total:M+A+N};
+}
+function shiftCnt(rid,ri){ return shiftCntByType(rid,ri).total; }
+function holShiftCnt(rid,ri) {
+  let c=0;
+  for(let d=1;d<=rotDays(ri);d++){
+    if(!isSpecialDay(ri,d)) continue;
+    SHIFTS.forEach(s=>{ if((perRot[ri].sched[d]?.[s]||[]).includes(rid)) c++; });
+  }
+  return c;
+}
+function prevShiftOf(rid,ri,d) {
+  if(d<=1) return null;
+  for(const s of SHIFTS) if((perRot[ri].sched[d-1]?.[s]||[]).includes(rid)) return s;
+  return null;
+}
+// Hard constraints:
+// - A→N: บ่าย (d) → ดึก (d+1) ห้าม (ต่อเนื่อง 16:00→00:08)
+// - N→M: ดึก (d) → เช้า (d+1) ห้าม (ต่อเนื่อง 00:08→08:16)
+// NOTE: บ่าย (d) กับ ดึก (d) เป็นคนละเวลา ไม่ต่อเนื่อง อนุญาตได้
+// กฎห้าม 2 ข้อเท่านั้น:
+// 1. บ่าย + ดึก วันเดียวกัน (A+N same day)
+// 2. ดึกวันก่อน + เช้าวันถัดไป (N day d → M day d+1)
+function violatesHard(rid,ri,d,shift) {
+  // กรณี 2: ดึกเมื่อวาน → เช้าวันนี้
+  const p = prevShiftOf(rid,ri,d);
+  if(shift==='M' && p==='N') return true;
+  // กรณี 1: มีบ่ายวันนี้แล้ว จะเพิ่มดึก หรือ มีดึกวันนี้แล้ว จะเพิ่มบ่าย
+  const todayA = (perRot[ri].sched[d]?.A||[]).includes(rid);
+  const todayN = (perRot[ri].sched[d]?.N||[]).includes(rid);
+  if(shift==='N' && todayA) return true;
+  if(shift==='A' && todayN) return true;
+  return false;
+}
+function violatesForward(rid,ri,d,shift) {
+  // ดึกวันนี้ แล้วมีเช้าพรุ่งนี้แล้ว — ตรวจ boundary ด้วย
+  const maxDay = rotates[ri]?.days || rotDays(ri);
+  if(shift==='N' && d < maxDay){
+    if((perRot[ri]?.sched[d+1]?.M||[]).includes(rid)) return true;
+  }
+  return false;
+}
+function softPenalty(rid,ri,d,shift) {
+  let p=0;
+  const prev=prevShiftOf(rid,ri,d);
+  if(prev==='N') p+=10;
+  if(shift==='A'&&prev==='N') p+=8;
+  return p;
+}
+// alreadyToday: อยู่เวรในวันนี้แล้ว (ป้องกัน double-shift ในโหมดปกติ)
+function alreadyToday(rid,ri,d){ return SHIFTS.some(s=>(perRot[ri].sched[d]?.[s]||[]).includes(rid)); }
+function hadNightYesterday(rid,ri,d){ if(d<=1) return false; return (perRot[ri].sched[d-1]?.N||[]).includes(rid); }
+function seniorOk(rids,shift) {
+  const y3=rids.filter(id=>getR(id)?.year===3).length;
+  const y2=rids.filter(id=>getR(id)?.year===2).length;
+  return shift==='N'? y3>=1||y2>=1 : y3>=1||y2>=2;
+}
+function typeImbalance(rid,ri,shift,typeCnt) {
+  const c=typeCnt[rid]||{M:0,A:0,N:0};
+  const tot=c.M+c.A+c.N;
+  if(tot===0) return 0;
+  return c[shift]-(tot/3);
+}
+
+// ============================================================
+// AUTO SCHEDULE (v2 — improved algorithm)
+// Rules:
+// 1. No holiday fairness weighting
+// 2. Night clustering: prefer 2-3 consecutive nights
+// 3. Hard block: N→M and A→N only
+// 4. Morning 4 priority before Afternoon 5
+// 5. Senior fallback: R2 >= 1 ok (not 2)
+// 6. Double shift on shortage days (M+A or M+N)
+// 7. Special blocked dates (exams etc)
+// 8. FILL MODE: ถ้ามีคนอยู่แล้ว จะเติมเฉพาะช่องที่ขาด ไม่ล้างใหม่
+// ============================================================
+// ============================================================
+// UNDO / REDO STATE STACK
+// ============================================================
+// ============================================================
+// SCHEDULE WEIGHTS (global, adjustable via modal)
+// ============================================================
+let W = {
+  night:    20,  // night balance within year
+  type:      6,  // M/A/N balance within year
+  wknd:      8,  // weekend balance
+  double:   15,  // double shift penalty
+  rest:     30,  // no long rest penalty
+  cluster:  15,  // night clustering bonus
+};
+
+function openWeightModal() {
+  // Sync sliders to current W values
+  document.getElementById('ws-night').value   = W.night;
+  document.getElementById('ws-type').value    = W.type;
+  document.getElementById('ws-wknd').value    = W.wknd;
+  document.getElementById('ws-double').value  = W.double;
+  document.getElementById('ws-rest').value    = W.rest;
+  document.getElementById('ws-cluster').value = W.cluster;
+  document.getElementById('wv-night').textContent   = W.night;
+  document.getElementById('wv-type').textContent    = W.type;
+  document.getElementById('wv-wknd').textContent    = W.wknd;
+  document.getElementById('wv-double').textContent  = W.double;
+  document.getElementById('wv-rest').textContent    = W.rest;
+  document.getElementById('wv-cluster').textContent = W.cluster;
+  document.getElementById('weight-overlay').classList.add('open');
+}
+function closeWeightModal() {
+  document.getElementById('weight-overlay').classList.remove('open');
+}
+document.addEventListener('DOMContentLoaded', ()=>{
+  document.getElementById('weight-overlay')?.addEventListener('click', e=>{
+    if(e.target===document.getElementById('weight-overlay')) closeWeightModal();
+  });
+});
+
+const PRESETS = {
+  default: {night:20, type:6,  wknd:8,  double:15, rest:30, cluster:15},
+  night:   {night:35, type:4,  wknd:5,  double:15, rest:20, cluster:20},
+  spread:  {night:15, type:18, wknd:8,  double:15, rest:25, cluster:8},
+  weekend: {night:15, type:6,  wknd:18, double:15, rest:25, cluster:10},
+  loose:   {night:8,  type:3,  wknd:3,  double:5,  rest:10, cluster:5},
+};
+
+function applyPreset(name) {
+  const p = PRESETS[name]; if(!p) return;
+  Object.keys(p).forEach(k=>{
+    const sl = document.getElementById('ws-'+k);
+    const vl = document.getElementById('wv-'+k);
+    if(sl) sl.value = p[k];
+    if(vl) vl.textContent = p[k];
+  });
+}
+
+function confirmWeightSchedule() {
+  // Read slider values → update global W
+  W.night   = +document.getElementById('ws-night').value;
+  W.type    = +document.getElementById('ws-type').value;
+  W.wknd    = +document.getElementById('ws-wknd').value;
+  W.double  = +document.getElementById('ws-double').value;
+  W.rest    = +document.getElementById('ws-rest').value;
+  W.cluster = +document.getElementById('ws-cluster').value;
+  closeWeightModal();
+  autoSchedule(false);
+}
+
+let undoStack = [];
+let redoStack = [];
+
+function pushUndo() {
+  const ri = RI;
+  undoStack.push(JSON.stringify(perRot[ri].sched));
+  if (undoStack.length > 30) undoStack.shift();
+  redoStack = [];
+  updateUndoRedoBtns();
+}
+function undoSchedule() {
+  if (!undoStack.length) { showToast('⚠ ไม่มีประวัติย้อนกลับ','err'); return; }
+  const ri = RI;
+  redoStack.push(JSON.stringify(perRot[ri].sched));
+  perRot[ri].sched = JSON.parse(undoStack.pop());
+  saveState(); renderTable(); updateUndoRedoBtns();
+  showToast('↶ Undo แล้ว','ok');
+}
+function redoSchedule() {
+  if (!redoStack.length) { showToast('⚠ ไม่มีประวัติทำซ้ำ','err'); return; }
+  const ri = RI;
+  undoStack.push(JSON.stringify(perRot[ri].sched));
+  perRot[ri].sched = JSON.parse(redoStack.pop());
+  saveState(); renderTable(); updateUndoRedoBtns();
+  showToast('↷ Redo แล้ว','ok');
+}
+function updateUndoRedoBtns() {
+  const u = document.getElementById('btn-undo');
+  const r = document.getElementById('btn-redo');
+  if (u) u.style.opacity = undoStack.length ? '1' : '0.4';
+  if (r) r.style.opacity = redoStack.length ? '1' : '0.4';
+}
+
+// ============================================================
+// CP / OPTIMIZATION SCHEDULING ENGINE
+// ============================================================
+// Uses a multi-pass greedy algorithm with constraint satisfaction
+// and night-balance post-processing to achieve near-optimal results
+// within a single-file JS without external solver dependencies.
+// ============================================================
+function autoSchedule(fillMode=true) {
+  const ri = RI;
+  const days = rotDays(ri);
+  pushUndo();
+
+  if (!fillMode) {
+    for (let d=1;d<=days;d++) perRot[ri].sched[d]={M:[],A:[],N:[]};
+  } else {
+    for (let d=1;d<=days;d++){
+      if (!perRot[ri].sched[d]) perRot[ri].sched[d]={M:[],A:[],N:[]};
+      SHIFTS.forEach(s=>{ if(!perRot[ri].sched[d][s]) perRot[ri].sched[d][s]=[]; });
+    }
+  }
+
+  const ar = activeRes(ri);
+  if (!ar.length) { showToast('⚠ ไม่มี Resident ที่ active','err'); return; }
+
+  // ── Quota tracking ──────────────────────────────────────────
+  const rem = {};
+  const typeCnt = {};
+  const wkndCnt = {}; // weekend/holiday shift count
+  ar.forEach(r => {
+    const already = shiftCntByType(r.id, ri);
+    rem[r.id] = Math.max(0, QUOTA[r.year] - already.total);
+    typeCnt[r.id] = {...already};
+    // นับ weekend shifts ที่มีอยู่แล้ว (fill mode)
+    let wc = 0;
+    for (let d=1;d<=days;d++) {
+      if (!isSpecialDay(ri,d)) continue;
+      SHIFTS.forEach(s=>{ if((perRot[ri].sched[d]?.[s]||[]).includes(r.id)) wc++; });
+    }
+    wkndCnt[r.id] = wc;
+  });
+  function wkndImbal(rid) {
+    const r = getR(rid); if(!r) return 0;
+    const peers = ar.filter(x=>x.year===r.year);
+    const avg = peers.reduce((s,x)=>s+wkndCnt[x.id],0)/peers.length;
+    return wkndCnt[rid] - avg;
+  }
+
+  // Within-year type imbalance: เทียบ M/A/N ของคนนี้กับเพื่อนปีเดียวกัน
+  function typeImbalWithinYear(rid, shift) {
+    const r = getR(rid); if(!r) return 0;
+    const peers = ar.filter(x=>x.year===r.year);
+    if(peers.length < 2) return 0;
+    const avg = peers.reduce((s,x)=>s+(typeCnt[x.id]?.[shift]||0),0)/peers.length;
+    return (typeCnt[rid]?.[shift]||0) - avg; // positive = มีมากกว่าเพื่อน
+  }
+
+  // ── Night balance target per year group ──────────────────────
+  // Target N per person ≈ days * 3N/day / activeCount, capped at ~QUOTA/3
+  function nightTargetForYear(yr) {
+    const cnt = ar.filter(r=>r.year===yr).length;
+    if (!cnt) return 0;
+    return Math.round(days * 3 / Math.max(cnt, 1) * 0.33);
+  }
+  const nTarget = {1: nightTargetForYear(1), 2: nightTargetForYear(2), 3: nightTargetForYear(3)};
+
+  // Current N count for a resident (live from typeCnt)
+  const nCnt = rid => typeCnt[rid]?.N || 0;
+
+  // Night imbalance vs peers (positive = has too many nights)
+  function nightImbal(rid) {
+    const r = getR(rid); if (!r) return 0;
+    const peers = ar.filter(x=>x.year===r.year);
+    const avg = peers.reduce((s,x)=>s+nCnt(x.id),0) / peers.length;
+    return nCnt(rid) - avg;
+  }
+
+  // ── Night streak tracker ──────────────────────────────────────
+  const streak = {};
+  ar.forEach(r => streak[r.id] = 0);
+
+  // ── Block / availability checks ──────────────────────────────
+  function isBlockedCP(rid, d) { return false; } // special blocks UI removed
+
+  function canAssign(rid, d, shift, excl=[], allowDouble=false) {
+    if (excl.includes(rid)) return false;
+    if (isUnavailForShift(rid, ri, d, shift)) return false;
+    if (isBlockedCP(rid, d)) return false;
+    if (rem[rid] <= 0) return false;
+    // กฎ 1: บ่าย + ดึก วันเดียวกัน ห้าม
+    const todayA = (perRot[ri].sched[d]?.A||[]).includes(rid);
+    const todayN = (perRot[ri].sched[d]?.N||[]).includes(rid);
+    if (shift==='N' && todayA) return false;
+    if (shift==='A' && todayN) return false;
+    // กฎ 2: ดึกเมื่อวาน → เช้าวันนี้ ห้าม
+    if (shift==='M' && prevShiftOf(rid,ri,d)==='N') return false;
+    // ดึกวันนี้ → มีเช้าพรุ่งนี้แล้ว ห้าม
+    if (shift==='N' && d<days && (perRot[ri].sched[d+1]?.M||[]).includes(rid)) return false;
+    // อนุญาตทุกอย่างอื่น — แต่ถ้าทำงานวันนี้แล้ว ต้องผ่าน allowDouble
+    if (!allowDouble && alreadyToday(rid, ri, d)) return false;
+    return true;
+  }
+
+  // ── Scoring for candidate ranking ───────────────────────────
+  function score(rid, d, shift, isDouble=false) {
+    let s = 0;
+    // Double-shift penalty ปรับตาม preference และ W.double
+    if (isDouble) {
+      const r = getR(rid);
+      const pref = r?.prefersDouble;
+      if (pref === true)       s += Math.round(W.double * 0.2);
+      else if (pref === false) s += Math.round(W.double * 2.3);
+      else                     s += W.double;
+    }
+    // Soft: หยุดติดต่อกันนาน
+    let restStreak = 0;
+    for (let dd=d-1; dd>=Math.max(1,d-6); dd--) {
+      if (SHIFTS.some(sh=>(perRot[ri].sched[dd]?.[sh]||[]).includes(rid))) break;
+      restStreak++;
+    }
+    if (restStreak >= 5) s += W.rest;
+    // Night balance + clustering
+    if (shift === 'N') {
+      s += nightImbal(rid) * W.night;
+      const st = streak[rid];
+      if (st > 0 && st < 3) s -= W.cluster;
+      if (st >= 3)           s += Math.round(W.cluster * 1.67);
+      // Year preference: R1 preferred, R3 slight penalty
+      const yr = getR(rid)?.year || 2;
+      if (yr === 1) s -= 3;
+      if (yr === 3) s += 3;
+    }
+    // Weekend balance
+    s += wkndImbal(rid) * W.wknd;
+    // Within-year type balance
+    s += typeImbalWithinYear(rid, shift) * W.type;
+    // Self type balance (N priority)
+    const tc = typeCnt[rid];
+    const tot = tc.M + tc.A + tc.N;
+    if (tot > 0) {
+      if (shift === 'N') s += (tc.N - tot/3) * 8;
+      else s += (tc[shift] - tot/3) * 1;
+    }
+    // Post-night rest penalty
+    s += softPenalty(rid, ri, d, shift) * 2;
+    // Remaining quota
+    s -= rem[rid] * 0.5;
+    return s;
+  }
+
+  // Double-shift rules: M+A ok, M+N ok, A+N ห้าม (ต่อเนื่องข้ามวัน)
+  function isDoubleOk(rid, d, shift) {
+    const today = SHIFTS.filter(s => (perRot[ri].sched[d]?.[s]||[]).includes(rid));
+    if (!today.length) return true; // ไม่ได้อยู่เวรวันนี้เลย → ไม่ใช่ double
+    // ห้าม A+N (เพราะ A 16-24 ต่อ N 00-08 วันถัดไป แต่ถ้าอยู่วันเดียวกัน A+N = ทำงานตลอด)
+    if (today.includes('A') && shift === 'N') return false;
+    if (today.includes('N') && shift === 'A') return false;
+    // ห้าม N+M วันเดียวกัน (ดึก 00-08 แล้วเช้า 08-16 ทำงานต่อ)
+    if (today.includes('N') && shift === 'M') return false;
+    if (today.includes('M') && shift === 'N') return false;
+    return true; // M+A ok
+  }
+
+  function pickBest(d, shift, need, excl=[], allowDouble=false) {
+    const cands = ar
+      .filter(r => canAssign(r.id, d, shift, excl, allowDouble))
+      .sort((a, b) => {
+        const aDouble = alreadyToday(a.id, ri, d);
+        const bDouble = alreadyToday(b.id, ri, d);
+        return score(a.id, d, shift, aDouble) - score(b.id, d, shift, bDouble);
+      });
+    return cands.slice(0, need).map(r => r.id);
+  }
+
+  // ── Senior quality enforcement ────────────────────────────────
+  // M/A: R3>=1 OR R2>=1 (senior must be present)
+  // N: prefer R1 > R2 > R3 (junior takes more nights)
+  function pickWithSeniority(d, shift, count, excl=[]) {
+    const cur = [];
+    const elig = ar.filter(r => canAssign(r.id, d, shift, excl));
+    const srt = (a, b) => {
+      const aD = alreadyToday(a.id, ri, d);
+      const bD = alreadyToday(b.id, ri, d);
+      return score(a.id, d, shift, aD) - score(b.id, d, shift, bD);
+    };
+
+    if (shift === 'N') {
+      // เวรดึก: R1 ได้ก่อนเล็กน้อย แต่ R2/R3 ใกล้เคียงกัน
+      // รวมทุกคนแล้ว sort ด้วย score (ซึ่งรวม year penalty เล็กน้อยแล้ว)
+      const allElig = elig.sort(srt);
+      // ต้องมี senior (R2 หรือ R3) อย่างน้อย 1 คน
+      const seniorFirst = allElig.find(r=>r.year>=2);
+      if (seniorFirst && !cur.includes(seniorFirst.id)) cur.push(seniorFirst.id);
+      // เติมที่เหลือตาม score
+      for (const r of allElig) {
+        if (cur.length >= count) break;
+        if (!cur.includes(r.id)) cur.push(r.id);
+      }
+    } else {
+      // M/A: R3 ก่อน R2 (senior ต้องอยู่ด้วย)
+      const r3 = elig.filter(r=>r.year===3).sort(srt);
+      const r2 = elig.filter(r=>r.year===2).sort(srt);
+      if (r3.length > 0) cur.push(r3[0].id);
+      else if (r2.length > 0) cur.push(r2[0].id);
+      pickBest(d, shift, count - cur.length, cur).forEach(id => cur.push(id));
+    }
+    return cur.slice(0, count);
+  }
+
+  // ── Assignment ────────────────────────────────────────────────
+  function assign(d, shift, rids) {
+    rids.forEach(rid => {
+      if (perRot[ri].sched[d][shift].includes(rid)) return;
+      perRot[ri].sched[d][shift].push(rid);
+      rem[rid]--;
+      typeCnt[rid][shift]++;
+      if (isSpecialDay(ri,d)) wkndCnt[rid] = (wkndCnt[rid]||0)+1;
+      if (shift === 'N') streak[rid]++;
+      else streak[rid] = 0;
+    });
+  }
+
+  function resetStreaks(d) {
+    ar.forEach(r => {
+      if (!(perRot[ri].sched[d]?.N||[]).includes(r.id)) streak[r.id] = 0;
+    });
+  }
+
+  // ── PASS 1: Fill base 3 per shift each day ────────────────────
+  for (let d=1; d<=days; d++) {
+    for (const s of SHIFTS) assign(d, s, pickWithSeniority(d, s, 3));
+    resetStreaks(d);
+  }
+
+  // ── PASS 2: Expand per pattern (ดึงจาก getSchedulePattern โดยตรง) ──
+  const pat = getSchedulePattern(ri);
+  const patternM = pat.M;
+  const patternA = pat.A;
+  const patternN = pat.N;
+  function isConfDay(d) {
+    // วันอังคาร = Conference อัตโนมัติทุกสัปดาห์
+    if (isTue(ri, d)) return true;
+    const ds = rotDayStr(ri, d);
+    return (perRot[ri].confDays||[]).some(c=>c.date===ds);
+  }
+
+  // ── PASS 2: Expand per pattern ──────────────────────────────────
+  // Priority:
+  // 1. เช้า→4 และ บ่าย→4 ทุกวัน (วันธรรมดาก่อน วันหยุดทีหลัง)
+  // 2. ถ้าคนไม่พอ → ยอมให้ 3 (วันหยุดถูก sacrifice ก่อน)
+  // 3. บ่าย→5 เฉพาะถ้า quota เหลือ
+  const daysSorted = Array.from({length:days},(_,i)=>i+1).sort((a,b)=>{
+    const aSp = isSpecialDay(ri,a) ? 1 : 0;
+    const bSp = isSpecialDay(ri,b) ? 1 : 0;
+    return aSp - bSp; // weekdays (0) ก่อน weekends (1)
+  });
+
+  // Step 1: M→patternM และ A→4 ทุกวัน (วันธรรมดาก่อน)
+  for (const d of daysSorted) {
+    // เช้า → patternM (ไม่ขยายถ้า conference day)
+    if (!isConfDay(d)) {
+      const curM = perRot[ri].sched[d].M;
+      if (curM.length < patternM) assign(d, 'M', pickBest(d, 'M', patternM-curM.length, curM));
+    }
+    // บ่าย → 4 ก่อน (step 3 จะขยายถึง 5 ทีหลัง)
+    const curA = perRot[ri].sched[d].A;
+    const aTarget = Math.min(patternA, 4);
+    if (curA.length < aTarget)
+      assign(d, 'A', pickBest(d, 'A', aTarget-curA.length, curA));
+  }
+
+  // Step 2: N → patternN (ถ้า > 3)
+  if (patternN > 3) {
+    for (const d of daysSorted) {
+      const cur = perRot[ri].sched[d].N;
+      if (cur.length < patternN) assign(d, 'N', pickBest(d, 'N', patternN-cur.length, cur));
+    }
+  }
+
+  // Step 3: บ่าย → 5 เฉพาะถ้า pattern ต้องการ และยังมี quota
+  if (patternA > 4) {
+    for (const d of daysSorted) {
+      const cur = perRot[ri].sched[d].A;
+      if (cur.length < patternA) assign(d, 'A', pickBest(d, 'A', patternA-cur.length, cur));
+    }
+  }
+
+  // ── PASS 3: Shortage fill with double-shift ───────────────────
+  for (let d=1; d<=days; d++) {
+    for (const s of SHIFTS) {
+      const cur = perRot[ri].sched[d][s];
+      if (cur.length < 3) {
+        assign(d, s, pickBest(d, s, 3-cur.length, cur, true));
+      }
+    }
+  }
+
+  // ── PASS 4: Night balance post-processing (swap to equalize N) ─
+  // Find pairs where one person has too many nights vs peer,
+  // and another has too few — try to swap a non-conflicting night
+  const MAX_SWAPS = days * 3;
+  let swaps = 0;
+  for (let iter=0; iter<MAX_SWAPS; iter++) {
+    let bestSwap = null, bestGain = 0.5;
+    for (let d=1; d<=days; d++) {
+      const nShift = perRot[ri].sched[d]?.N || [];
+      for (const rich of nShift) {
+        const richR = getR(rich); if (!richR) continue;
+        const richImbal = nightImbal(rich);
+        if (richImbal <= 0) continue; // not over-assigned
+        // Find a peer (same year) not on night this day who has fewer nights
+        const peers = ar.filter(p =>
+          p.year === richR.year &&
+          p.id !== rich &&
+          !nShift.includes(p.id) &&
+          nightImbal(p.id) < richImbal - 1
+        );
+        for (const poor of peers) {
+          // Check if poor can take this night
+          if (!canAssign(poor.id, d, 'N', nShift.filter(x=>x!==rich))) continue;
+          const gain = richImbal - nightImbal(poor.id);
+          if (gain > bestGain) { bestGain = gain; bestSwap = {d, rich: rich, poor: poor.id}; }
+        }
+      }
+    }
+    if (!bestSwap) break;
+    // Execute swap
+    const {d, rich, poor} = bestSwap;
+    const ni = perRot[ri].sched[d].N.indexOf(rich);
+    if (ni >= 0) {
+      perRot[ri].sched[d].N.splice(ni, 1, poor);
+      typeCnt[rich].N--; rem[rich]++;
+      typeCnt[poor].N++;  rem[poor]--;
+      swaps++;
+    }
+  }
+
+  saveState(); renderTable(); updateUndoRedoBtns();
+  const nightVar = computeNightVariance(ri);
+  showToast(fillMode
+    ? `✅ Fill เสร็จ · Night variance: ${nightVar.toFixed(2)}`
+    : `✅ จัดใหม่เสร็จ · Night variance: ${nightVar.toFixed(2)} (${swaps} swaps)`,
+    'ok');
+}
+
+// Compute max night variance within any year group
+function computeNightVariance(ri) {
+  let maxVar = 0;
+  [1,2,3].forEach(yr => {
+    const ar = activeRes(ri).filter(r=>r.year===yr);
+    if (ar.length < 2) return;
+    const ns = ar.map(r=>shiftCntByType(r.id,ri).N);
+    const avg = ns.reduce((s,x)=>s+x,0)/ns.length;
+    const variance = ns.reduce((s,x)=>s+Math.pow(x-avg,2),0)/ns.length;
+    maxVar = Math.max(maxVar, Math.sqrt(variance));
+  });
+  return maxVar;
+}
+
+function clearSchedule(){
+  pushUndo();
+  const ri = RI, days = rotDays(ri);
+  for(let d=1;d<=days;d++) perRot[ri].sched[d]={M:[],A:[],N:[]};
+  saveState(); renderTable(); updateUndoRedoBtns();
+  showToast('🗑 ล้างตารางแล้ว','ok');
+}
+
+
+
+// ============================================================
+// RENDER ROTATE CHIPS
+// ============================================================
+function renderRotateChips(containerId, activeRi, clickFn) {
+  const el = document.getElementById(containerId);
+  if(!el) return;
+  el.innerHTML = rotates.map((r,i)=>`
+    <div class="rotate-chip${i===activeRi?' active':''}" onclick="${clickFn}(${i})" title="${r.dateRange}">
+      ${r.label}
+      <span class="rc-dates">${r.shortRange}</span>
+      <span class="rot-edit-btn" onclick="event.stopPropagation();openEditRotate(${i})" title="แก้ไข/ลบ">✏️</span>
+    </div>`).join('');
+}
+function selectRotate(i){
+  RI=i;
+  undoStack=[]; redoStack=[]; // reset undo history เมื่อเปลี่ยน rotate
+  updateUndoRedoBtns();
+  renderAll();
+}
+
+// ============================================================
+// RENDER TABLE
+// ============================================================
+function renderTable(){
+  if (!rotates.length) { renderEmptyState(); return; }
+  const ri=RI, rot=rotates[ri];
+  document.getElementById('rot-title').textContent=`${rot.label}`;
+  document.getElementById('rot-sub').textContent=`${rot.dateRange} · ${rot.days||28} DAYS`;
+  // Pattern badge
+  if (rotates.length) {
+    const pat = getSchedulePattern(ri);
+    const pb = document.getElementById('pattern-badge');
+    if(pb){ pb.textContent=pat.label; pb.title=pat.desc; pb.style.background=pat.warn?'#fee2e2':'#e0f2fe'; pb.style.color=pat.warn?'#dc2626':'#0369a1'; }
+  }
+  renderConfChipsInline();
+  document.getElementById('res-rot-label').textContent=rot.label;
+  document.getElementById('lv-rot-label').textContent=rot.label;
+  renderRotateChips('rotate-chips', ri, 'selectRotate');
+
+  const tbody=document.getElementById('sched-body');
+  tbody.innerHTML='';
+
+  for(let d=1;d<=rotDays(ri);d++){
+    const dt=rotDay(ri,d);
+    const wd=dt.getDay();
+    const isTu=wd===2, isWk=wd===0||wd===6;
+    const isHol=isHoliday(ri,d), isSp=isWk||isHol;
+    const hasRest=activeRes(ri).some(r=>hadNightYesterday(r.id,ri,d));
+    // Conference day check (อังคารทุกสัปดาห์ + วันพิเศษ)
+    const _ds=rotDayStr(ri,d);
+    const _cday=(perRot[ri].confDays||[]).find(x=>x.date===_ds);
+    const isConf = isTu || !!_cday;
+    const confLabel = _cday ? _cday.type : (isTu ? 'Conference' : '');
+
+    const tr=document.createElement('tr');
+    tr.className='day-row'+(isWk?' weekend':'')+(isHol&&!isWk?' holiday-row':'')+(isTu?' tuesday-row':'')+(hasRest?' rest-day':'')+(isConf?' conf-day':'');
+
+    // DATE CELL
+    const dc=document.createElement('td');
+    dc.className='date-cell';
+    let tags='';
+    if(isHol) tags+=`<span class="dtag dtag-hol">🎌 ${holName(ri,d)||'หยุด'}</span>`;
+    if(isConf) tags+=`<span class="dtag dtag-conf">📋 ${confLabel}</span>`;
+    if(hasRest) tags+=`<span class="dtag dtag-rest">💤 พักดึก</span>`;
+    dc.innerHTML=`
+      <div class="date-full">${dt.getDate()} ${TH_MONTHS[dt.getMonth()+1]} ${dt.getFullYear()+543}</div>
+      <div class="date-dow${isWk?' we':''}${isTu?' tue':''}">${DOW_FULL[wd]}${isSp?' 🌟':''}</div>
+      <div style="font-size:9px;color:var(--light);font-family:'IBM Plex Mono',monospace">วันที่ ${d}/${rot.days||28}</div>
+      ${tags?'<div class="date-tags">'+tags+'</div>':''}`;
+    tr.appendChild(dc);
+
+    for(const shift of SHIFTS){
+      const td=document.createElement('td');
+      // Conference day: เวรเช้า highlight พิเศษ
+      const isConfM = isConf && shift==='M';
+      td.className='shift-cell'+(isConfM?' conf-morning-cell':'');
+      const assigned=perRot[ri].sched[d][shift]||[];
+      const cnt=assigned.length;
+      const sOk=cnt>0?seniorOk(assigned,shift):true;
+      const constErr=assigned.filter(rid=>violatesHard(rid,ri,d,shift));
+      const softV=assigned.filter(rid=>softPenalty(rid,ri,d,shift)>0);
+
+      const nl=document.createElement('div');
+      nl.className='names-list';
+      assigned.forEach(rid=>{
+        const r=getR(rid); if(!r) return;
+        const sp=softPenalty(rid,ri,d,shift);
+        const icon=sp>=10?'😴':sp>=8?'😓':'';
+        const chip=document.createElement('div');
+        chip.style.cssText=`background:${r.bg};color:${r.color};border:1px solid ${isSp?'#f59e0b':r.border};display:flex;align-items:center;gap:5px;padding:3px 8px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;transition:all .1s;user-select:none;`;
+        chip.innerHTML=`<span style="width:6px;height:6px;border-radius:50%;background:${isSp?'#f59e0b':r.color};flex-shrink:0;display:inline-block"></span>${icon}${displayName(r)}`;
+        chip.title=`${r.name} ปี ${r.year} | M:${shiftCntByType(rid,ri).M} A:${shiftCntByType(rid,ri).A} N:${shiftCntByType(rid,ri).N}`;
+        chip.onmouseenter=()=>{chip.style.filter='brightness(0.9)';chip.style.transform='translateX(1px)';};
+        chip.onmouseleave=()=>{chip.style.filter='';chip.style.transform='';};
+        chip.onclick=()=>openModal(d,shift);
+        nl.appendChild(chip);
+      });
+      activeRes(ri).forEach(r=>{
+        // All-day leave (show on all shift columns)
+        const lt=lvTypeOf(r.id,ri,d); if(!lt) return;
+        const isLv=lt==='LEAVE';
+        const chip=document.createElement('div');
+        chip.style.cssText=`background:${isLv?'#fee2e2':'#f1f5f9'};color:${isLv?'#dc2626':'#475569'};border:1px solid ${isLv?'#fecaca':'#e2e8f0'};display:flex;align-items:center;gap:5px;padding:3px 8px;border-radius:6px;font-size:12px;font-weight:500;opacity:0.65;text-decoration:line-through;pointer-events:none;`;
+        chip.innerHTML=`<span style="width:6px;height:6px;border-radius:50%;background:${isLv?'#dc2626':'#94a3b8'};flex-shrink:0;display:inline-block"></span>${displayName(r)} (${isLv?'ลา':'งาน'})`;
+        nl.appendChild(chip);
+      });
+      // Shift-specific leave (show only on matching shift column)
+      activeRes(ri).forEach(r=>{
+        const shiftLvs=lvShiftLeaves(r.id,ri,d).filter(l=>l.shift===shift);
+        shiftLvs.forEach(l=>{
+          const isLv=l.type==='LEAVE';
+          const sIcon={M:'☀',A:'🌆',N:'🌙'}[l.shift]||'';
+          const chip=document.createElement('div');
+          chip.style.cssText=`background:${isLv?'#fff7ed':'#f8fafc'};color:${isLv?'#c2410c':'#64748b'};border:1px solid ${isLv?'#fed7aa':'#e2e8f0'};display:flex;align-items:center;gap:5px;padding:3px 8px;border-radius:6px;font-size:12px;font-weight:500;opacity:0.7;text-decoration:line-through;pointer-events:none;`;
+          chip.innerHTML=`<span style="width:6px;height:6px;border-radius:50%;background:${isLv?'#f97316':'#94a3b8'};flex-shrink:0;display:inline-block"></span>${displayName(r)} (${sIcon}${isLv?'ลา':'งาน'})`;
+          nl.appendChild(chip);
+        });
+      });
+      td.appendChild(nl);
+      const ab=document.createElement('div');
+      ab.className='add-slot';ab.innerHTML='＋ แก้ไข';ab.onclick=()=>openModal(d,shift);
+      td.appendChild(ab);
+      const ft=document.createElement('div');
+      ft.className='shift-footer';
+      const cc=cnt>=3?'cnt-ok':cnt>0?'cnt-warn':'cnt-err';
+      ft.innerHTML=`<span class="cnt-badge ${cc}">${cnt} คน</span>`;
+      if(isSp) ft.innerHTML+=`<span class="flag flag-green">🌟</span>`;
+      if(constErr.length>0) ft.innerHTML+=`<span class="flag flag-err">⛔</span>`;
+      if(softV.length>0) ft.innerHTML+=`<span class="flag flag-warn">😴</span>`;
+      if(cnt>0&&cnt<3) ft.innerHTML+=`<span class="flag flag-warn">⚠ขาด</span>`;
+      if(shift==='M'&&isTu&&cnt>3) ft.innerHTML+=`<span class="flag flag-warn">⚠เกิน</span>`;
+      if(!sOk&&cnt>0) ft.innerHTML+=`<span class="flag flag-purple">⚠senior</span>`;
+      td.appendChild(ft);
+      tr.appendChild(td);
+    }
+    tbody.appendChild(tr);
+  }
+  updateStats();
+}
+
+function updateStats(){
+  const ri=RI;
+  const ar=activeRes(ri);
+  let constErr=0,under=0,softW=0;
+  for(let d=1;d<=rotDays(ri);d++){
+    for(const s of SHIFTS){
+      const asgn=perRot[ri].sched[d][s]||[];
+      if(asgn.length>0&&asgn.length<3) under++;
+      asgn.forEach(rid=>{ if(violatesHard(rid,ri,d,s)) constErr++; if(softPenalty(rid,ri,d,s)>0) softW++; });
+    }
+  }
+  const tot={1:0,2:0,3:0};
+  ar.forEach(r=>{ tot[r.year]+=shiftCnt(r.id,ri); });
+  const totalShifts = tot[1]+tot[2]+tot[3];
+  // เวรรวมเป้าหมาย = sum of all active residents' quota
+  const targetShifts = ar.reduce((s,r)=>s+QUOTA[r.year],0);
+  const spreads=ar.map(r=>{ const c=shiftCntByType(r.id,ri); return Math.max(c.M,c.A,c.N)-Math.min(c.M,c.A,c.N); });
+  const maxSp=spreads.length?Math.max(...spreads):0;
+  const holCnts=ar.map(r=>holShiftCnt(r.id,ri));
+  const holSp=holCnts.length?Math.max(...holCnts,0)-Math.min(...holCnts,0):0;
+  document.getElementById('stats-row').innerHTML=`
+    <div class="stat"><div class="stat-label">เวรรวม (เป้า ${targetShifts})</div><div class="stat-val ${totalShifts>=targetShifts?'ok':totalShifts>0?'warn':'blue'}">${totalShifts}</div></div>
+    <div class="stat"><div class="stat-label">ปี 1 (เป้า ${QUOTA[1]})</div><div class="stat-val blue">${tot[1]}</div></div>
+    <div class="stat"><div class="stat-label">ปี 2 (เป้า ${QUOTA[2]})</div><div class="stat-val blue">${tot[2]}</div></div>
+    <div class="stat"><div class="stat-label">ปี 3 (เป้า ${QUOTA[3]})</div><div class="stat-val blue">${tot[3]}</div></div>
+    <div class="stat"><div class="stat-label">⛔ ผิดกฎ</div><div class="stat-val ${constErr>0?'err':'ok'}">${constErr}</div></div>
+    <div class="stat"><div class="stat-label">😴 เวรหนัก</div><div class="stat-val ${softW>0?'warn':'ok'}">${softW}</div></div>
+    <div class="stat"><div class="stat-label">⚖️ ความสม่ำเสมอ</div><div class="stat-val ${maxSp<=2?'ok':maxSp<=4?'warn':'err'}">${maxSp}</div></div>
+    <div class="stat"><div class="stat-label">🌟 วันหยุด</div><div class="stat-val ${holSp<=2?'ok':holSp<=4?'warn':'err'}">${holSp}</div></div>`;
+}
+
+// ============================================================
+// FAIRNESS
+// ============================================================
+
+// ============================================================
+// ADD / REMOVE ROTATE
+// ============================================================
+let rotModalMode = 'add'; // 'add' or 'edit'
+let rotModalEditIdx = -1;
+
+function openAddRotate(){
+  rotModalMode='add'; rotModalEditIdx=-1;
+  const nextStr = rotates.length>0 ? nextRotateStart(rotates.length-1) : '2026-06-29';
+  const nextDt = new Date(nextStr+'T00:00:00');
+  const endDt = new Date(nextDt); endDt.setDate(endDt.getDate()+27);
+  const toStr = d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  document.getElementById('rot-modal-title').textContent='➕ เพิ่ม Rotate ใหม่';
+  document.getElementById('rot-modal-confirm-btn').textContent='+ เพิ่ม Rotate';
+  document.getElementById('add-rot-sub').textContent=`จะเป็นรอบที่ ${rotates.length+1}`;
+  document.getElementById('new-rot-name').value = `Rotate ${rotates.length + 1}`;
+  document.getElementById('new-rot-start').value=nextStr;
+  document.getElementById('new-rot-end').value=toStr(endDt);
+  document.getElementById('rot-modal-del-btn').innerHTML='';
+  updateRotPreview();
+  document.getElementById('add-rot-overlay').classList.add('open');
+}
+
+function openEditRotate(ri){
+  rotModalMode='edit'; rotModalEditIdx=ri;
+  const rot=rotates[ri];
+  const toStr=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  document.getElementById('rot-modal-title').textContent='✏️ แก้ไข Rotate';
+  document.getElementById('rot-modal-confirm-btn').textContent='💾 บันทึก';
+  document.getElementById('add-rot-sub').textContent=rot.dateRange;
+  document.getElementById('new-rot-name').value=rot.label;
+  document.getElementById('new-rot-start').value=rot.startStr;
+  document.getElementById('new-rot-end').value=toStr(rot.endDate);
+  // Delete button
+  document.getElementById('rot-modal-del-btn').innerHTML=
+    `<button class="btn btn-outline" style="border-color:#fca5a5;color:#dc2626" onclick="deleteRotate(${ri})">🗑 ลบ Rotate นี้</button>`;
+  updateRotPreview();
+  document.getElementById('add-rot-overlay').classList.add('open');
+}
+
+function updateRotPreview(){
+  const s=document.getElementById('new-rot-start').value;
+  const e=document.getElementById('new-rot-end').value;
+  const el=document.getElementById('new-rot-preview');
+  if(!s||!e){ el.innerHTML='<span style="color:var(--muted)">เลือกวันเริ่มต้นและวันสุดท้าย</span>'; return; }
+  const start=new Date(s+'T00:00:00'), end=new Date(e+'T00:00:00');
+  if(end<start){ el.innerHTML='<span style="color:#dc2626">⚠ วันสุดท้ายต้องมาหลังวันเริ่มต้น</span>'; return; }
+  const days=Math.round((end-start)/(1000*60*60*24))+1;
+  const fmt=d=>`${d.getDate()} ${TH_MONTHS[d.getMonth()+1]} ${d.getFullYear()+543}`;
+  el.innerHTML=`📅 ${fmt(start)} – ${fmt(end)} <strong>(${days} วัน)</strong>`;
+}
+
+function closeAddRotate(){ document.getElementById('add-rot-overlay').classList.remove('open'); }
+
+function confirmRotModal(){
+  const startVal=document.getElementById('new-rot-start').value;
+  const endVal=document.getElementById('new-rot-end').value;
+  const nameVal=document.getElementById('new-rot-name').value.trim()||null;
+  if(!startVal||!endVal){ showToast('⚠ กรุณาเลือกวันเริ่มต้นและวันสุดท้าย','err'); return; }
+  const s=new Date(startVal+'T00:00:00'), e=new Date(endVal+'T00:00:00');
+  if(e<s){ showToast('⚠ วันสุดท้ายต้องมาหลังวันเริ่มต้น','err'); return; }
+  const days=Math.round((e-s)/(1000*60*60*24))+1;
+
+  if(rotModalMode==='add'){
+    const ri=createRotate(startVal, endVal, nameVal);
+    saveState();
+    RI=rotates.length-1;
+    renderRotateChips('rotate-chips',RI,'selectRotate');
+    renderTable();
+    closeAddRotate();
+    showToast(`✅ เพิ่ม ${nameVal||'Rotate'} (${days} วัน) แล้ว`,'ok');
+  } else {
+    // Edit existing
+    const ri=rotModalEditIdx;
+    rotates[ri]=makeRotate(startVal, ri, endVal, nameVal);
+    // Resize sched if days changed
+    const oldDays=Object.keys(perRot[ri].sched).length;
+    if(days>oldDays){
+      for(let d=oldDays+1;d<=days;d++) perRot[ri].sched[d]={M:[],A:[],N:[]};
+    } else if(days<oldDays){
+      for(let d=days+1;d<=oldDays;d++) delete perRot[ri].sched[d];
+    }
+    saveState();
+    renderRotateChips('rotate-chips',RI,'selectRotate');
+    renderTable();
+    closeAddRotate();
+    showToast(`✅ บันทึก ${nameVal||'Rotate'} แล้ว`,'ok');
+  }
+}
+
+function deleteRotate(ri){
+  if(rotates.length<=1){ showToast('⚠ ต้องมีอย่างน้อย 1 Rotate','err'); return; }
+  if(!confirm(`ลบ "${rotates[ri].label}" ?
+ข้อมูลตารางและคำขอลาใน Rotate นี้จะหายทั้งหมด`)) return;
+  rotates.splice(ri,1);
+  perRot.splice(ri,1);
+  // Re-index
+  rotates.forEach((r,i)=>r.idx=i);
+  RI=Math.min(RI,rotates.length-1);
+  saveState();
+  renderRotateChips('rotate-chips',RI,'selectRotate');
+  renderTable();
+  closeAddRotate();
+  showToast('🗑 ลบ Rotate แล้ว','ok');
+}
+
+// Legacy alias
+function confirmAddRotate(){ confirmRotModal(); }
+
+// ============================================================
+// HOLIDAYS
+// ============================================================
+
+// ============================================================
+// RESIDENTS
+// ============================================================
+function renderResGrid(){
+  const ri=RI, grid=document.getElementById('res-grid');
+  grid.innerHTML='';
+  const cols={1:'#059669',2:'#2563eb',3:'#9333ea'};
+  [1,2,3].forEach(yr=>{
+    const card=document.createElement('div');
+    card.className='yr-card';
+    const actCnt=RES.filter(r=>r.year===yr&&perRot[ri].active[r.id]!==false).length;
+    card.innerHTML=`<div class="yr-card-hd"><span style="color:${cols[yr]};font-weight:700;font-size:15px">ปี ${yr}</span><span style="font-size:11px;color:var(--muted)">อยู่เวร ${actCnt} คน · เป้า ${QUOTA[yr]}</span></div>`;
+    RES.filter(r=>r.year===yr).forEach(r=>{
+      const isOn=perRot[ri].active[r.id]!==false;
+      const c=shiftCntByType(r.id,ri);
+      const row=document.createElement('div');
+      row.className='res-row';
+      const pref = r.prefersDouble;
+      const prefIcon = pref===true?'💪':pref===false?'🚫':'➖';
+      row.innerHTML=`
+        <div style="display:flex;align-items:center;gap:8px;flex:1;">
+          <span style="width:10px;height:10px;border-radius:3px;background:${r.bg};border:2px solid ${r.color};display:inline-block;flex-shrink:0"></span>
+          <div>
+            <div style="font-weight:600;font-size:13px;color:${r.color}">${displayName(r)}</div>
+            <div style="font-size:11px;color:var(--muted)">M:${c.M} A:${c.A} N:${c.N} · รวม:${c.total}/${QUOTA[r.year]}</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+          <div title="Double shift preference" onclick="cycleDoubleShiftPref('${r.id}')" style="cursor:pointer;font-size:16px;padding:2px 4px;border-radius:4px;background:${pref===true?'#dcfce7':pref===false?'#fee2e2':'#f1f5f9'}" title="${pref===true?'ชอบ double shift':pref===false?'ไม่ชอบ double shift':'ไม่ได้ตั้งค่า'}">${prefIcon}</div>
+          <div class="toggle${isOn?' on':''}" onclick="toggleRes('${r.id}')"></div>
+        </div>`;
+      card.appendChild(row);
+    });
+    grid.appendChild(card);
+  });
+}
+// Cycle double shift preference: undefined → true (ชอบ) → false (ไม่ชอบ) → undefined
+function cycleDoubleShiftPref(id) {
+  const r = RES.find(x=>x.id===id); if(!r) return;
+  if (r.prefersDouble === undefined || r.prefersDouble === null) r.prefersDouble = true;
+  else if (r.prefersDouble === true) r.prefersDouble = false;
+  else r.prefersDouble = undefined;
+  // Save to nameOverrides/er28_res
+  try {
+    const saved = JSON.parse(localStorage.getItem('er28_res')||'[]');
+    const idx = saved.findIndex(x=>x.id===id);
+    if(idx>=0) saved[idx].prefersDouble = r.prefersDouble;
+    else saved.push({...r});
+    localStorage.setItem('er28_res', JSON.stringify(saved));
+  } catch(e) {}
+  renderResGrid();
+  const label = r.prefersDouble===true?'💪 ชอบ double shift':r.prefersDouble===false?'🚫 ไม่ชอบ double shift':'➖ ไม่ได้ตั้งค่า';
+  showToast(`${r.name}: ${label}`,'ok');
+}
+
+function toggleRes(id){
+  const ri=RI;
+  // ถ้า key ไม่มีหรือเป็น true → set เป็น false (off)
+  // ถ้าเป็น false → set เป็น true (on)
+  const current = perRot[ri].active[id];
+  perRot[ri].active[id] = (current === false) ? true : false;
+  saveState(); renderResGrid(); renderTable();
+}
+
+// ============================================================
+// LEAVES (admin)
+// ============================================================
+function renderLeaveSelect(){
+  document.getElementById('lv-res').innerHTML=activeRes(RI).map(r=>`<option value="${r.id}">${displayName(r)}</option>`).join('');
+  updateQuotaDisplay();
+}
+function updateQuotaDisplay(){
+  const ri=RI, rid=document.getElementById('lv-res').value;
+  const lv=perRot[ri].lvs.filter(l=>l.residentId===rid&&l.type==='LEAVE').length;
+  const aw=perRot[ri].lvs.filter(l=>l.residentId===rid&&l.type==='AWAY').length;
+  document.getElementById('quota-display').innerHTML=`ลาพักร้อน: <strong>${lv} วัน</strong> · งานอื่น: <strong>${aw} วัน</strong>`;
+}
+
+function renderLeaveList(){
+  const ri=RI;
+  const lvs=perRot[ri].lvs;
+  document.getElementById('lv-cnt').textContent=lvs.length;
+  const entries=document.getElementById('lv-entries');
+  if(!lvs.length){ entries.innerHTML='<div style="padding:24px;text-align:center;color:var(--muted)">ยังไม่มีคำขอ</div>'; return; }
+
+  // Group by residentId
+  const grouped={};
+  lvs.forEach((lv,i)=>{
+    if(!grouped[lv.residentId]) grouped[lv.residentId]=[];
+    grouped[lv.residentId].push({...lv, _idx:i});
+  });
+
+  const SICON={ALL:'',M:'☀',A:'🌆',N:'🌙'};
+  const yr3=activeRes(ri).filter(r=>r.year===3);
+  const yr2=activeRes(ri).filter(r=>r.year===2);
+  const yr1=activeRes(ri).filter(r=>r.year===1);
+  const order=[...yr3,...yr2,...yr1];
+
+  let html='';
+  order.forEach(r=>{
+    const rLvs=grouped[r.id];
+    if(!rLvs||!rLvs.length) return;
+    const sorted=[...rLvs].sort((a,b)=>a.date.localeCompare(b.date));
+    html+=`<div style="border-bottom:2px solid var(--border);">
+      <div style="padding:8px 16px;background:${r.bg};display:flex;align-items:center;justify-content:space-between;">
+        <span style="font-weight:700;font-size:13px;color:${r.color}">${displayName(r)}</span>
+        <span style="font-size:11px;color:${r.color};opacity:.7">${sorted.length} รายการ</span>
+      </div>`;
+    sorted.forEach(lv=>{
+      const dt=new Date(lv.date+'T00:00:00');
+      const ds=`${dt.getDate()} ${TH_MONTHS[dt.getMonth()+1]} ${dt.getFullYear()+543} ${DOW_TH[dt.getDay()]}`;
+      const sIcon=SICON[lv.shift||'ALL'];
+      const sLabel=lv.shift&&lv.shift!=='ALL'?({M:'เช้า',A:'บ่าย',N:'ดึก'}[lv.shift]||''):'ทั้งวัน';
+      html+=`<div class="lv-entry" style="padding-left:24px;">
+        <div>
+          <div style="font-weight:600;font-size:13px;">${ds}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:1px;">${sIcon} ${sLabel}${lv.note?' · '+lv.note:''}</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span class="lv-badge lv-${lv.type}">${lv.type==='LEAVE'?'ลา':'งานอื่น'}</span>
+          <button class="del-btn" onclick="adminRemoveLv(${lv._idx})">×</button>
+        </div>
+      </div>`;
+    });
+    html+='</div>';
+  });
+  entries.innerHTML=html||'<div style="padding:24px;text-align:center;color:var(--muted)">ยังไม่มีคำขอ</div>';
+}
+
+function updateLvShiftLabel() {
+  const shift=document.querySelector('input[name="lv-shift"]:checked')?.value||'ALL';
+  const note=document.getElementById('lv-shift-note'); if(!note) return;
+  const msgs={ALL:'ลาทั้งวัน',M:'ลาเฉพาะเวรเช้า — ยังอยู่บ่าย/ดึกได้',A:'ลาเฉพาะเวรบ่าย — ยังอยู่เช้า/ดึกได้',N:'ลาเฉพาะเวรดึก — ยังอยู่เช้า/บ่ายได้'};
+  note.textContent=msgs[shift]||'';
+}
+
+function addLeave(){
+  const ri=RI, rot=rotates[ri];
+  const rid=document.getElementById('lv-res').value;
+  const date=document.getElementById('lv-date').value;
+  const type=document.getElementById('lv-type').value;
+  const note=document.getElementById('lv-note').value.trim();
+  const shift=document.querySelector('input[name="lv-shift"]:checked')?.value||'ALL';
+
+  if(!date){ showToast('⚠ กรุณาเลือกวันที่','err'); return; }
+  const dt=new Date(date+'T00:00:00');
+  if(dt<rot.startDate||dt>rot.endDate){ showToast('⚠ วันที่ไม่อยู่ในรอบนี้','err'); return; }
+  if(perRot[ri].lvs.find(l=>l.residentId===rid&&l.date===date&&(l.shift||'ALL')===shift)){
+    showToast('⚠ มีคำขอวันนี้แล้ว','err'); return;
+  }
+  perRot[ri].lvs.push({residentId:rid,date,type,note,shift});
+  const dayIdx=Math.round((dt-rot.startDate)/(1000*60*60*24))+1;
+  if(dayIdx>=1&&dayIdx<=rot.days){
+    const shiftsToRemove=shift==='ALL'?SHIFTS:[shift];
+    shiftsToRemove.forEach(s=>{ perRot[ri].sched[dayIdx][s]=(perRot[ri].sched[dayIdx][s]||[]).filter(id=>id!==rid); });
+  }
+  document.getElementById('lv-date').value='';
+  document.getElementById('lv-note').value='';
+  saveState(); renderLeaveList(); renderTable(); updateQuotaDisplay();
+  const sLabel={ALL:'ทั้งวัน',M:'☀เช้า',A:'🌆บ่าย',N:'🌙ดึก'}[shift]||'';
+  showToast(`✅ เพิ่มคำขอลา (${sLabel}) แล้ว`,'ok');
+}
+
+function adminRemoveLv(idx){ perRot[RI].lvs.splice(idx,1); saveState(); renderLeaveList(); renderTable(); }
+
+
+
+// ============================================================
+// MODAL
+// ============================================================
+let mCtx={};
+function openModal(d,shift){
+  const ri=RI, rot=rotates[ri];
+  mCtx={d,shift};
+  const dt=rotDay(ri,d); const wd=dt.getDay();
+  const isTu=wd===2, isHol=isSpecialDay(ri,d);
+  const assigned=[...(perRot[ri].sched[d][shift]||[])];
+  document.getElementById('modal-h').textContent=`เวร${SNAME[shift]} — ${formatDate(dt)} (วันที่ ${d}/28)`;
+  document.getElementById('modal-sub').textContent=`${STIME[shift]} · ${rot.label} ${rot.dateRange}`;
+  let infos='';
+  if(isHol) infos+=`<div class="info-box orange">🌟 วันหยุด${holName(ri,d)?' — '+holName(ri,d):''}</div>`;
+  const _confDs=rotDayStr(ri,d); const _isConf=(perRot[ri].confDays||[]).some(x=>x.date===_confDs);
+  if(_isConf&&shift==='M') infos+=`<div class="info-box yellow">⚠ วันประชุม — เวรเช้าควรมีแค่ 3 คน</div>`;
+  if(!seniorOk(assigned,shift)&&assigned.length>0) infos+=`<div class="info-box purple">⚠ ควรมีปี 3 ≥1 หรือ ปี 2 ≥${shift==='N'?1:2}</div>`;
+  document.getElementById('modal-infos').innerHTML=infos;
+  const picker=document.getElementById('modal-picker');
+  picker.innerHTML='';
+  activeRes(ri).sort((a,b)=>b.year-a.year||a.name.localeCompare(b.name)).forEach(r=>{
+    const isSel=assigned.includes(r.id);
+    const unav=isUnavail(r.id,ri,d);
+    // ตรวจเฉพาะ 2 กรณีที่ห้ามจริงๆ
+    const tA=(perRot[ri].sched[d]?.A||[]).includes(r.id);
+    const tN=(perRot[ri].sched[d]?.N||[]).includes(r.id);
+    const p2=prevShiftOf(r.id,ri,d);
+    const nextM=(perRot[ri].sched[d+1]?.M||[]).includes(r.id);
+    const hard=!isSel&&(
+      (shift==='N'&&tA)||(shift==='A'&&tN) || // กฎ1: A+N วันเดียวกัน
+      (shift==='M'&&p2==='N') ||               // กฎ2: N(เมื่อวาน)→M
+      (shift==='N'&&nextM)                     // กฎ2: N(วันนี้)→M(พรุ่งนี้)
+    );
+    const isDouble=!isSel&&!hard&&!unav&&alreadyToday(r.id,ri,d);
+    const blocked=unav||hard;
+    const sp=softPenalty(r.id,ri,d,shift);
+    const c=shiftCntByType(r.id,ri);
+    const item=document.createElement('div');
+    item.className='pick-item'+(isSel?' selected':'')+(blocked?' unavail':'')+(isDouble?' double-shift':'');
+    if(!blocked&&!isSel&&!isDouble) item.style.borderLeft=`3px solid ${r.color}`;
+    if(!blocked&&!isSel&&isDouble) item.style.cssText=`background:#fffbeb;border:1px solid #f59e0b;border-left:3px solid #f59e0b`;
+    if(isSel) item.style.cssText=`background:${r.bg};border:1px solid ${r.color};border-left:3px solid ${r.color}`;
+    let meta='';
+    if(unav) meta='🔴 ลา/ไม่ว่าง';
+    else if(hard){
+      if((shift==='N'&&tA)||(shift==='A'&&tN)) meta='⛔ บ่าย+ดึก วันเดียวกัน ห้าม';
+      else if(shift==='M'&&p2==='N') meta='⛔ ดึกเมื่อวาน → เช้าวันนี้ ห้าม';
+      else if(shift==='N'&&nextM) meta='⛔ ดึกวันนี้ → เช้าพรุ่งนี้ ห้าม';
+      else meta='⛔ ผิด constraint';
+    } else if(isDouble) {
+      meta='⚠ Double shift วันนี้';
+    } else {
+      const sp=softPenalty(r.id,ri,d,shift);
+      const w=sp>=10?'😴':sp>=8?'😓':'';
+      const ct=shiftCntByType(r.id,ri);
+      meta=`${w?w+' ':''}M:${ct.M} A:${ct.A} N:${ct.N} | รวม:${ct.total}/${QUOTA[r.year]}`;
+    }
+
+    item.innerHTML=`
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="width:10px;height:10px;border-radius:3px;background:${r.bg};border:2px solid ${r.color};flex-shrink:0;display:inline-block"></span>
+        <div><div class="pick-name" style="color:${r.color}">${displayName(r)}</div><div class="pick-meta">${meta}</div></div>
+      </div>
+      ${isSel?'<span style="color:#16a34a;font-size:18px;font-weight:700">✓</span>':''}`;
+    if(!blocked) item.onclick=()=>toggleAssign(r.id,d,shift);
+    picker.appendChild(item);
+  });
+  document.getElementById('overlay').classList.add('open');
+}
+function toggleAssign(rid,d,shift){
+  const ri=RI, arr=perRot[ri].sched[d][shift];
+  const idx=arr.indexOf(rid);
+  if(idx>=0){
+    // Remove — push undo first
+    pushUndo();
+    arr.splice(idx,1);
+  } else {
+    // ตรวจกฎ 2 ข้อเท่านั้น
+    // กฎ 1: บ่าย + ดึก วันเดียวกัน
+    const todayA=(perRot[ri].sched[d]?.A||[]).includes(rid);
+    const todayN=(perRot[ri].sched[d]?.N||[]).includes(rid);
+    if(shift==='N'&&todayA){ showToast('⛔ บ่าย+ดึก วันเดียวกัน ห้าม','err'); return; }
+    if(shift==='A'&&todayN){ showToast('⛔ บ่าย+ดึก วันเดียวกัน ห้าม','err'); return; }
+    // กฎ 2: ดึกเมื่อวาน → เช้าวันนี้
+    const p=prevShiftOf(rid,ri,d);
+    if(shift==='M'&&p==='N'){ showToast('⛔ ดึกเมื่อวาน → เช้าวันนี้ ห้าม','err'); return; }
+    // ดึกวันนี้ → มีเช้าพรุ่งนี้แล้ว
+    if(shift==='N'&&(perRot[ri].sched[d+1]?.M||[]).includes(rid)){ showToast('⛔ ดึกวันนี้ → เช้าพรุ่งนี้ ห้าม','err'); return; }
+    // ทุกอย่างอื่นอนุญาต — เช้า+บ่าย, บ่าย(d)→ดึก(d+1) ฯลฯ ok
+    if(alreadyToday(rid,ri,d)) showToast('⚠ Double shift วันนี้','ok');
+    pushUndo();
+    arr.push(rid);
+  }
+  saveState(); openModal(d,shift); renderTable(); updateUndoRedoBtns();
+}
+function closeModal(){ document.getElementById('overlay').classList.remove('open'); }
+document.getElementById('overlay').addEventListener('click',e=>{ if(e.target===document.getElementById('overlay')) closeModal(); });
+document.getElementById('add-rot-overlay').addEventListener('click',e=>{ if(e.target===document.getElementById('add-rot-overlay')) closeAddRotate(); });
+
+// ============================================================
+// EXPORT
+// ============================================================
+// ============================================================
+// DOWNLOAD HELPER — works in sandboxed iframes & normal browsers
+// ============================================================
+function triggerDownload(filename, dataUrl) {
+  // Method 1: try standard anchor click
+  try {
+    const a = document.createElement('a');
+    a.href = dataUrl;
+    a.download = filename;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    // Show fallback link after short delay in case click was blocked
+    setTimeout(() => showDownloadFallback(filename, dataUrl), 800);
+  } catch(e) {
+    showDownloadFallback(filename, dataUrl);
+  }
+}
+
+function showDownloadFallback(filename, dataUrl) {
+  // Remove old fallback if any
+  const old = document.getElementById('dl-fallback');
+  if (old) old.remove();
+
+  const bar = document.createElement('div');
+  bar.id = 'dl-fallback';
+  bar.style.cssText = `
+    position:fixed; bottom:80px; right:24px; z-index:400;
+    background:#1e293b; border:1px solid #334155; border-radius:12px;
+    padding:16px 20px; max-width:320px;
+    box-shadow:0 8px 32px rgba(0,0,0,.35);
+    animation: slideUp .25s ease;
+  `;
+  bar.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <span style="color:#f1f5f9;font-weight:700;font-size:13px">📥 พร้อม Download</span>
+      <button onclick="document.getElementById('dl-fallback').remove()" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:18px;line-height:1">×</button>
+    </div>
+    <div style="font-size:11px;color:#64748b;margin-bottom:12px;font-family:'IBM Plex Mono',monospace">${filename}</div>
+    <a href="${dataUrl}" download="${filename}" style="
+      display:block;text-align:center;padding:10px;
+      background:#22c55e;color:#fff;border-radius:8px;
+      font-weight:700;font-size:13px;text-decoration:none;
+    ">⬇ กดที่นี่เพื่อ Download</a>
+  `;
+  document.body.appendChild(bar);
+  // Auto-remove after 30s
+  setTimeout(() => { if(document.getElementById('dl-fallback')) document.getElementById('dl-fallback').remove(); }, 30000);
+}
+
+
+
+
+// ============================================================
+// NAV
+// ============================================================
+function switchTab(tab,btn){
+  document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tab-'+tab).classList.add('active');
+  if(btn) btn.classList.add('active');
+  if(tab==='residents') renderResGrid();
+  if(tab==='leaves'){ renderLeaveSelect(); renderLeaveList(); }
+  if(tab==='settings'){ renderResManageGrid(); renderConfDays(); }
+}
+function renderAll(){
+  renderRotateChips('rotate-chips',RI,'selectRotate');
+  renderTable();
+  // Update holiday/resident/leave labels
+  if(document.getElementById('tab-settings')?.classList.contains('active')){ renderResManageGrid(); }
+  if(document.getElementById('tab-residents').classList.contains('active')) renderResGrid();
+  if(document.getElementById('tab-leaves').classList.contains('active')){ renderLeaveSelect(); renderLeaveList(); }
+  if(document.getElementById('tab-settings').classList.contains('active')){ renderResManageGrid(); }
+}
+function showToast(msg,type='ok'){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.className=`toast ${type} show`;
+  setTimeout(()=>t.classList.remove('show'),2800);
+}
+
+
+// ============================================================
+// ============================================================
+// SUMMARY PREVIEW (A4 single-page export)
+// ============================================================
+function buildSummaryHTML(ri) {
+  const rot = rotates[ri];
+  const ar = activeRes(ri);
+  const days = rot.days || 28;
+  const DOW_EN = ['อา','จ','อ','พ','พฤ','ศ','ส'];
+
+  // Header
+  let html = `
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;border-bottom:2px solid #1e293b;padding-bottom:8px;">
+      <div>
+        <div style="font-size:18px;font-weight:800;color:#1e293b;">ตารางเวร Resident ER</div>
+        <div style="font-size:12px;color:#475569;margin-top:1px">โรงพยาบาลจุฬาลงกรณ์ • ${rot.label}</div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:13px;font-weight:700;color:#dc2626;">${rot.dateRange}</div>
+        <div style="font-size:11px;color:#64748b;margin-top:1px">รวม ${days} วัน</div>
+      </div>
+    </div>`;
+
+  // Main calendar table
+  html += `<table style="width:100%;border-collapse:collapse;font-size:9px;margin-bottom:10px;table-layout:fixed;">
+    <thead>
+      <tr>
+        <th style="background:#1e293b;color:#fff;padding:4px 3px;border:1px solid #334155;width:22px;">#</th>
+        <th style="background:#1e293b;color:#fff;padding:4px 3px;border:1px solid #334155;width:50px;">วันที่</th>
+        <th style="background:#1e293b;color:#fff;padding:4px 3px;border:1px solid #334155;width:24px;">วัน</th>
+        <th style="background:#78350f;color:#fff;padding:4px;border:1px solid #92400e;">☀ เช้า 08–16</th>
+        <th style="background:#1e3a8a;color:#fff;padding:4px;border:1px solid #1d4ed8;">🌆 บ่าย 16–24</th>
+        <th style="background:#3b0764;color:#fff;padding:4px;border:1px solid #581c87;">🌙 ดึก 00–08</th>
+      </tr>
+    </thead>
+    <tbody>`;
+
+  for (let d=1; d<=days; d++) {
+    const dt = rotDay(ri, d);
+    const wd = dt.getDay();
+    const isWk = wd===0||wd===6;
+    const isHol = isHoliday(ri, d);
+    const isSp = isWk||isHol;
+    const rowBg = isHol ? '#fff7ed' : isWk ? '#fff5f5' : (d%2===0 ? '#f8fafc' : '#fff');
+    const dayBg = isHol ? '#fed7aa' : isWk ? '#fecaca' : '#e2e8f0';
+    const dayColor = isHol ? '#9a3412' : isWk ? '#b91c1c' : '#1e293b';
+
+    const renderShift = (s) => {
+      const ids = perRot[ri].sched[d]?.[s] || [];
+      return ids.map(id => {
+        const r = getR(id); if (!r) return '';
+        return `<span style="display:inline-block;padding:1px 4px;margin:1px;border-radius:3px;background:${r.bg};color:${r.color};border:1px solid ${r.border};font-size:8px;font-weight:600;white-space:nowrap;">R${r.year} ${r.name}</span>`;
+      }).join('');
+    };
+
+
+    html += `<tr style="background:${rowBg};">
+      <td style="border:1px solid #cbd5e1;padding:3px;text-align:center;font-weight:700;font-family:monospace;font-size:9px;color:#64748b;">${d}</td>
+      <td style="border:1px solid #cbd5e1;padding:3px;text-align:center;font-weight:700;font-size:9px;background:${dayBg};color:${dayColor};white-space:nowrap;">${dt.getDate()} ${TH_MONTHS[dt.getMonth()+1]}</td>
+      <td style="border:1px solid #cbd5e1;padding:3px;text-align:center;font-weight:600;font-size:9px;color:${dayColor};">${DOW_EN[wd]}${isSp?'🌟':''}</td>
+      <td style="border:1px solid #cbd5e1;padding:3px;vertical-align:top;line-height:1.6;">${renderShift('M')}</td>
+      <td style="border:1px solid #cbd5e1;padding:3px;vertical-align:top;line-height:1.6;">${renderShift('A')}</td>
+      <td style="border:1px solid #cbd5e1;padding:3px;vertical-align:top;line-height:1.6;">${renderShift('N')}</td>
+    </tr>`;
+  }
+  html += `</tbody></table>`;
+
+  // Summary section: per-resident counts
+  html += `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;font-size:9px;">`;
+  [3,2,1].forEach(yr => {
+    const yrColors = {1:'#059669',2:'#2563eb',3:'#9333ea'};
+    const yrBg = {1:'#f0fdf4',2:'#eff6ff',3:'#faf5ff'};
+    const arYr = ar.filter(r=>r.year===yr);
+    if (!arYr.length) return;
+    html += `<div style="border:1px solid ${yrColors[yr]};border-radius:6px;overflow:hidden;">
+      <div style="background:${yrBg[yr]};color:${yrColors[yr]};padding:4px 8px;font-weight:700;font-size:10px;border-bottom:1px solid ${yrColors[yr]};">ปี ${yr} (เป้า ${QUOTA[yr]} เวร)</div>
+      <table style="width:100%;border-collapse:collapse;font-size:9px;">
+        <thead><tr style="background:#f1f5f9;">
+          <th style="padding:3px 4px;border-bottom:1px solid #e2e8f0;text-align:left;">ชื่อ</th>
+          <th style="padding:3px;border-bottom:1px solid #e2e8f0;text-align:center;color:#b45309;">M</th>
+          <th style="padding:3px;border-bottom:1px solid #e2e8f0;text-align:center;color:#1d4ed8;">A</th>
+          <th style="padding:3px;border-bottom:1px solid #e2e8f0;text-align:center;color:#7c3aed;">N</th>
+          <th style="padding:3px;border-bottom:1px solid #e2e8f0;text-align:center;font-weight:700;">รวม</th>
+        </tr></thead>
+        <tbody>`;
+    arYr.forEach(r => {
+      const c = shiftCntByType(r.id, ri);
+      const totColor = c.total === QUOTA[yr] ? '#16a34a' : c.total > QUOTA[yr] ? '#dc2626' : '#d97706';
+      html += `<tr>
+        <td style="padding:3px 4px;border-bottom:1px solid #f1f5f9;color:${r.color};font-weight:600;">${r.name}</td>
+        <td style="padding:3px;border-bottom:1px solid #f1f5f9;text-align:center;font-family:monospace;">${c.M}</td>
+        <td style="padding:3px;border-bottom:1px solid #f1f5f9;text-align:center;font-family:monospace;">${c.A}</td>
+        <td style="padding:3px;border-bottom:1px solid #f1f5f9;text-align:center;font-family:monospace;">${c.N}</td>
+        <td style="padding:3px;border-bottom:1px solid #f1f5f9;text-align:center;font-weight:700;color:${totColor};font-family:monospace;">${c.total}</td>
+      </tr>`;
+    });
+    html += `</tbody></table></div>`;
+  });
+  html += `</div>`;
+
+  // Footer
+  html += `<div style="margin-top:10px;font-size:9px;color:#64748b;text-align:right;border-top:1px solid #e2e8f0;padding-top:5px;">
+    Generated: ${new Date().toLocaleString('th-TH')} • ER Resident Scheduler v3
+  </div>`;
+
+  return html;
+}
+
+function openSummaryPreview() {
+  const ri = RI;
+  const rot = rotates[ri];
+  document.getElementById('prev-rot-info').textContent = `${rot.label} · ${rot.dateRange}`;
+  document.getElementById('preview-paper').innerHTML = buildSummaryHTML(ri);
+  document.getElementById('preview-overlay').classList.add('open');
+}
+
+function closeSummaryPreview() {
+  document.getElementById('preview-overlay').classList.remove('open');
+}
+
+async function downloadPreviewJPEG() {
+  const ri = RI, rot = rotates[ri];
+  const target = document.getElementById('preview-paper');
+  const ov = document.createElement('div');
+  ov.style.cssText='position:fixed;inset:0;background:rgba(15,23,42,.8);color:#fff;font-size:15px;font-weight:700;z-index:9999;display:flex;align-items:center;justify-content:center;gap:12px;';
+  ov.innerHTML='<span style="font-size:28px">📸</span> กำลังสร้างภาพ...';
+  document.body.appendChild(ov);
+  try {
+    const canvas = await html2canvas(target, { scale:2, useCORS:true, backgroundColor:'#fff', logging:false });
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+    const filename = `ER_${rot.label.replace(/\s+/g,'_')}_${rot.startStr}.jpeg`;
+    triggerDownload(filename, dataUrl);
+    showToast('📸 Download JPEG แล้ว','ok');
+  } catch(e) {
+    showToast('⚠ ไม่สามารถสร้างภาพได้','err');
+    console.error(e);
+  } finally {
+    document.body.removeChild(ov);
+  }
+}
+
+function printPreview() {
+  const ri = RI, rot = rotates[ri];
+  const win = window.open('', '_blank');
+  if (!win) { showToast('⚠ กรุณาอนุญาต popup ใน browser','err'); return; }
+  win.document.write(`<!DOCTYPE html><html><head>
+    <meta charset="UTF-8">
+    <title>ตารางเวร ER ${rot.label}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+      @page{size:A4 landscape;margin:8mm;}
+      body{margin:0;padding:0;font-family:Sarabun,sans-serif;color:#0f172a;}
+      @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}
+    </style>
+  </head><body>${buildSummaryHTML(ri)}
+  <script>window.onload=()=>{setTimeout(()=>window.print(),300);}<\/script>
+  </body></html>`);
+  win.document.close();
+  showToast('🖨 เปิดหน้า Print/PDF แล้ว','ok');
+}
+
+document.getElementById('preview-overlay').addEventListener('click', e=>{
+  if(e.target===document.getElementById('preview-overlay')) closeSummaryPreview();
+});
+
+// ============================================================
+// CONFERENCE DAYS
+// ============================================================
+function renderConfDays() {
+  const ri=RI, rot=rotates[ri];
+  const lbl=document.getElementById('conf-rot-label');
+  if(lbl) lbl.textContent=rot.label+' · '+rot.dateRange;
+  const inp=document.getElementById('conf-date-input');
+  if(inp){ inp.min=rot.startStr; const ed=rot.endDate; inp.max=`${ed.getFullYear()}-${String(ed.getMonth()+1).padStart(2,'0')}-${String(ed.getDate()).padStart(2,'0')}`; }
+  const el=document.getElementById('conf-days-list'); if(!el) return;
+  renderConfChipsTo(el, ri);
+}
+
+function renderConfChipsInline() {
+  const ri=RI, rot=rotates[ri];
+  const el=document.getElementById('conf-chips-inline'); if(!el) return;
+  const inp=document.getElementById('conf-date-inline');
+  if(inp){ inp.min=rot.startStr; const ed=rot.endDate; inp.max=`${ed.getFullYear()}-${String(ed.getMonth()+1).padStart(2,'0')}-${String(ed.getDate()).padStart(2,'0')}`; }
+  renderConfChipsTo(el, ri);
+}
+
+function renderConfChipsTo(el, ri) {
+  const conf=perRot[ri].confDays||[];
+  const typeColor={IH:'#0369a1',Tox:'#7c3aed',EMS:'#059669',Other:'#64748b'};
+  const typeBg={IH:'#e0f2fe',Tox:'#f3e8ff',EMS:'#d1fae5',Other:'#f1f5f9'};
+  if(!conf.length){ el.innerHTML='<span style="font-size:11px;color:var(--muted)">วันอังคาร = Conference อัตโนมัติ · เพิ่มวันพิเศษด้านขวา</span>'; return; }
+  el.innerHTML=conf.map((c,i)=>{
+    const dt=new Date(c.date+'T00:00:00');
+    const ds=`${dt.getDate()} ${TH_MONTHS[dt.getMonth()+1]} ${DOW_TH[dt.getDay()]}`;
+    return `<div style="display:flex;align-items:center;gap:5px;padding:3px 8px;background:${typeBg[c.type]||typeBg.Other};border:1px solid ${typeColor[c.type]||typeColor.Other};border-radius:5px;font-size:11px;font-weight:600;color:${typeColor[c.type]||typeColor.Other};">
+      📋 ${ds} <span style="opacity:.7">${c.type}</span>
+      <button onclick="removeConfDay(${i})" style="background:none;border:none;cursor:pointer;font-size:13px;line-height:1;padding:0 1px;color:${typeColor[c.type]||typeColor.Other}">×</button>
+    </div>`;
+  }).join('');
+}
+
+function addConfDayInline(){
+  const ri=RI, rot=rotates[ri];
+  const date=document.getElementById('conf-date-inline').value;
+  const type=document.getElementById('conf-type-inline').value;
+  if(!date){ showToast('⚠ กรุณาเลือกวันที่','err'); return; }
+  const dt=new Date(date+'T00:00:00');
+  if(dt<rot.startDate||dt>rot.endDate){ showToast('⚠ วันที่ไม่อยู่ใน '+rot.label,'err'); return; }
+  if(!perRot[ri].confDays) perRot[ri].confDays=[];
+  if(perRot[ri].confDays.find(c=>c.date===date)){ showToast('⚠ มีอยู่แล้ว','err'); return; }
+  perRot[ri].confDays.push({date,type});
+  perRot[ri].confDays.sort((a,b)=>a.date.localeCompare(b.date));
+  document.getElementById('conf-date-inline').value='';
+  saveState(); renderConfChipsInline(); renderTable();
+  showToast(`✅ เพิ่มวันประชุม ${type} แล้ว`,'ok');
+}
+
+function addConfDay(){
+  const ri=RI, rot=rotates[ri];
+  const date=document.getElementById('conf-date-input').value;
+  const type=document.getElementById('conf-type-input').value;
+  if(!date){ showToast('⚠ กรุณาเลือกวันที่','err'); return; }
+  const dt=new Date(date+'T00:00:00');
+  if(dt<rot.startDate||dt>rot.endDate){ showToast('⚠ วันที่ไม่อยู่ใน '+rot.label,'err'); return; }
+  if(!perRot[ri].confDays) perRot[ri].confDays=[];
+  if(perRot[ri].confDays.find(c=>c.date===date)){ showToast('⚠ มีอยู่แล้ว','err'); return; }
+  perRot[ri].confDays.push({date,type});
+  perRot[ri].confDays.sort((a,b)=>a.date.localeCompare(b.date));
+  saveState(); renderConfDays(); renderConfChipsInline(); renderTable();
+  showToast(`✅ เพิ่มวันประชุม ${type} แล้ว`,'ok');
+}
+
+function removeConfDay(i){
+  perRot[RI].confDays.splice(i,1);
+  saveState(); renderConfDays(); renderConfChipsInline(); renderTable();
+}
+
+// ============================================================
+// PATTERN DISPLAY — แสดงรูปแบบตารางที่เหมาะสม
+// ============================================================
+function getSchedulePattern(ri) {
+  const ar=activeRes(ri);
+  const totalQuota=ar.reduce((s,r)=>s+QUOTA[r.year],0);
+  const days=rotDays(ri);
+  if(totalQuota < 168) return {label:'⚠ น้อยเกินไป',desc:'เวรรวม < 168 แจ้งอาจารย์',M:3,A:3,N:2,warn:true};
+  if(totalQuota <= 196) return {label:'แบบ 1 (3-3-2)',desc:`เวรรวม ${totalQuota}`,M:3,A:3,N:2};
+  if(totalQuota <= 224) return {label:'แบบ 2 (3-3-3)',desc:`เวรรวม ${totalQuota}`,M:3,A:3,N:3};
+  if(totalQuota <= 260) return {label:'แบบ 3 (3-4-3)',desc:`เวรรวม ${totalQuota}`,M:3,A:4,N:3};
+  if(totalQuota <= 316) return {label:'แบบ 4 (4-5-3)',desc:`เวรรวม ${totalQuota}`,M:4,A:5,N:3};
+  return {label:'แบบ 5 (5-5-3)',desc:`เวรรวม ${totalQuota} · เช้า 5, บ่าย 5, ดึก 3`,M:5,A:5,N:3};
+}
+
+// ============================================================
+// SETTINGS — Edit Resident Names
+// ============================================================
+let nameOverrides = {};
+
+function loadNameOverrides() {
+  try {
+    // Load custom RES changes from er28_res
+    // er28_res only stores: name changes, color changes, added residents, deleted residents
+    // Base RES array is always the source of truth — only UPDATE, don't delete base residents
+    const rs = localStorage.getItem('er28_res');
+    if (rs) {
+      const saved = JSON.parse(rs);
+      saved.forEach(sr => {
+        const existing = RES.find(r=>r.id===sr.id);
+        if (!existing) {
+          // เป็น resident ที่เพิ่มใหม่ (ไม่อยู่ใน base RES)
+          RES.push(sr);
+        } else {
+          // update เฉพาะ field ที่เปลี่ยน
+          if (sr.name) existing.name = sr.name;
+          if (sr.color) existing.color = sr.color;
+          if (sr.bg) existing.bg = sr.bg;
+          if (sr.border) existing.border = sr.border;
+          if (sr.prefersDouble !== undefined) existing.prefersDouble = sr.prefersDouble;
+        }
+      });
+      // ลบเฉพาะ resident ที่ถูก mark ว่า deleted (ผ่าน deleteResident)
+      // ไม่ลบ resident ที่อยู่ใน base RES แต่ไม่อยู่ใน er28_res
+      const deletedIds = (JSON.parse(localStorage.getItem('er28_deleted')||'[]'));
+      for (let i=RES.length-1;i>=0;i--) {
+        if (deletedIds.includes(RES[i].id)) RES.splice(i,1);
+      }
+    }
+    // Apply name overrides
+    const s = localStorage.getItem('er28_names');
+    if (s) {
+      nameOverrides = JSON.parse(s);
+      RES.forEach(r => { if (nameOverrides[r.id]) r.name = nameOverrides[r.id]; });
+    }
+    // Load prefersDouble preference
+    try {
+      const saved = JSON.parse(localStorage.getItem('er28_res')||'[]');
+      saved.forEach(sr => {
+        const r = RES.find(x=>x.id===sr.id);
+        if(r && sr.prefersDouble !== undefined) r.prefersDouble = sr.prefersDouble;
+      });
+    } catch(e) {}
+  } catch(e) { console.warn('loadNameOverrides',e); }
+}
+// Color palettes for new residents
+const COLOR_PALETTES = {
+  3: [
+    {color:'#c2410c',bg:'#fff7ed',border:'#fed7aa'},{color:'#9f1239',bg:'#fff1f2',border:'#fecdd3'},
+    {color:'#92400e',bg:'#fef3c7',border:'#fde68a'},{color:'#7c2d12',bg:'#ffedd5',border:'#fdba74'},
+    {color:'#881337',bg:'#fce7f3',border:'#fbcfe8'},{color:'#713f12',bg:'#fefce8',border:'#fef08a'},
+    {color:'#991b1b',bg:'#fee2e2',border:'#fca5a5'},{color:'#86198f',bg:'#fdf4ff',border:'#f0abfc'},
+    {color:'#be123c',bg:'#fff1f2',border:'#fecdd3'},{color:'#9a3412',bg:'#fff7ed',border:'#fdba74'},
+  ],
+  2: [
+    {color:'#1e40af',bg:'#eff6ff',border:'#bfdbfe'},{color:'#0e7490',bg:'#ecfeff',border:'#a5f3fc'},
+    {color:'#1d4ed8',bg:'#dbeafe',border:'#93c5fd'},{color:'#0f766e',bg:'#f0fdfa',border:'#99f6e4'},
+    {color:'#3730a3',bg:'#eef2ff',border:'#c7d2fe'},{color:'#6b21a8',bg:'#f5f3ff',border:'#ddd6fe'},
+    {color:'#1e3a8a',bg:'#e0f2fe',border:'#7dd3fc'},{color:'#065f46',bg:'#d1fae5',border:'#6ee7b7'},
+    {color:'#0369a1',bg:'#e0f2fe',border:'#7dd3fc'},{color:'#4338ca',bg:'#eef2ff',border:'#c7d2fe'},
+  ],
+  1: [
+    {color:'#166534',bg:'#f0fdf4',border:'#bbf7d0'},{color:'#3f6212',bg:'#f7fee7',border:'#d9f99d'},
+    {color:'#14532d',bg:'#dcfce7',border:'#86efac'},{color:'#365314',bg:'#fefce8',border:'#fef08a'},
+    {color:'#1a3a1a',bg:'#f0fdf4',border:'#4ade80'},{color:'#4d7c0f',bg:'#ecfccb',border:'#bef264'},
+    {color:'#15803d',bg:'#d1fae5',border:'#34d399'},{color:'#064e3b',bg:'#ccfbf1',border:'#5eead4'},
+    {color:'#365314',bg:'#ecfccb',border:'#a3e635'},{color:'#166534',bg:'#dcfce7',border:'#6ee7b7'},
+  ]
+};
+
+function getNextResId() {
+  const maxId = Math.max(...RES.map(r => parseInt(r.id.replace('r',''))), 0);
+  return 'r' + (maxId + 1);
+}
+
+function renderResManageGrid() {
+  const grid = document.getElementById('res-manage-grid');
+  if (!grid) return;
+  const cols = {1:'#059669',2:'#2563eb',3:'#9333ea'};
+  const labels = {1:'ปี 1',2:'ปี 2',3:'ปี 3'};
+  const quotas = {1:22,2:22,3:20};
+  grid.innerHTML = [3,2,1].map(yr => {
+    const resOfYr = RES.filter(r=>r.year===yr);
+    return `<div class="res-mgmt-card">
+      <div class="res-mgmt-hd">
+        <span style="color:${cols[yr]};font-weight:700;font-size:14px">${labels[yr]}</span>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:11px;color:var(--muted)">${resOfYr.length} คน · เป้า ${quotas[yr]} เวร</span>
+          <button class="btn btn-green btn-sm" onclick="addResOfYear(${yr})" style="padding:4px 8px;font-size:11px">+ เพิ่ม</button>
+        </div>
+      </div>
+      ${resOfYr.map(r => `
+        <div class="res-item-row" id="row-${r.id}">
+          <div class="res-item-swatch" style="background:${r.color};border:1px solid ${r.border}"></div>
+          <input class="res-item-input" id="ne-${r.id}" value="${r.name}" placeholder="${r.name}" onchange="updateResName('${r.id}',this.value)">
+          <button class="res-item-del" onclick="deleteResident('${r.id}')" title="ลบ">×</button>
+        </div>`).join('')}
+    </div>`;
+  }).join('');
+}
+
+function updateResName(id, newName) {
+  const r = RES.find(x=>x.id===id);
+  if (r && newName.trim()) { r.name = newName.trim(); nameOverrides[id] = newName.trim(); }
+}
+
+function addResOfYear(yr) {
+  const resOfYr = RES.filter(r=>r.year===yr);
+  if(resOfYr.length>=9){ showToast('⚠ เพิ่มได้สูงสุด 9 คนต่อชั้นปี','err'); return; }
+  const palette = COLOR_PALETTES[yr];
+  const p = palette[resOfYr.length % palette.length];
+  const newId = getNextResId();
+  const pinNum = resOfYr.length + 1;
+  const pin = `${yr}${String(pinNum).padStart(3,'0')}`;
+  RES.push({ id:newId, name:`ปี${yr} คนที่${resOfYr.length+1}`, year:yr, pin, ...p });
+  // Add to all perRot active
+  perRot.forEach(pr => { pr.active[newId] = true; });
+  renderResManageGrid();
+  showToast(`✅ เพิ่ม Resident ปี ${yr} แล้ว`, 'ok');
+}
+
+function deleteResident(id) {
+  const r = RES.find(x=>x.id===id);
+  if (!r) return;
+  if (!confirm(`ลบ "${r.name}" ออกจากระบบ?\nข้อมูลเวรของคนนี้จะถูกลบทั้งหมด`)) return;
+  const idx = RES.findIndex(x=>x.id===id);
+  RES.splice(idx, 1);
+  // บันทึก id ที่ลบแล้วใน er28_deleted
+  try {
+    const deleted = JSON.parse(localStorage.getItem('er28_deleted')||'[]');
+    if (!deleted.includes(id)) deleted.push(id);
+    localStorage.setItem('er28_deleted', JSON.stringify(deleted));
+  } catch(e) {}
+  // Remove from all schedules
+  perRot.forEach(pr => {
+    delete pr.active[id];
+    Object.values(pr.sched).forEach(day => {
+      SHIFTS.forEach(s => { day[s] = (day[s]||[]).filter(x=>x!==id); });
+    });
+    pr.lvs = pr.lvs.filter(l=>l.residentId!==id);
+  });
+  saveState();
+  renderResManageGrid(); renderTable();
+  showToast(`🗑 ลบ ${r.name} แล้ว`, 'ok');
+}
+
+function renderNameEditGrid() { renderResManageGrid(); } // compat alias
+
+function saveResidentNames() {
+  RES.forEach(r => {
+    const el = document.getElementById(`ne-${r.id}`);
+    if (!el) return;
+    const v = el.value.trim();
+    if (v && v !== r.name) { r.name = v; nameOverrides[r.id] = v; }
+  });
+  try { localStorage.setItem('er28_names', JSON.stringify(nameOverrides)); } catch(e) {}
+  // บันทึกเฉพาะ resident ที่ถูกเพิ่มใหม่ (ไม่อยู่ใน base RES ดั้งเดิม)
+  // ไม่ overwrite ทั้ง list เพื่อป้องกัน base RES ถูกลบ
+  try {
+    const baseIds = ['r1','r2','r3','r4','r5','r6','r7','r8','r9','r10','r11','r12','r13','r14','r15','r16','r17','r18','r19','r20','r21','r22','r23','r24','r25'];
+    const added = RES.filter(r=>!baseIds.includes(r.id));
+    if (added.length > 0) {
+      localStorage.setItem('er28_res', JSON.stringify(added.map(r=>({id:r.id,name:r.name,year:r.year,pin:r.pin,color:r.color,bg:r.bg,border:r.border}))));
+    }
+  } catch(e) {}
+  renderTable(); renderResGrid(); renderLeaveSelect();
+  showToast('✅ บันทึกทั้งหมดแล้ว', 'ok');
+}
+
+
+
+// ============================================================
+// YEAR PROMOTION
+// ============================================================
+let newR1Rows = []; // [{name, tempId}]
+
+function openPromoteModal() {
+  newR1Rows = [];
+  // Render current R3 (จะจบ)
+  const r3 = RES.filter(r=>r.year===3);
+  const r2 = RES.filter(r=>r.year===2);
+  const r1 = RES.filter(r=>r.year===1);
+  const chip = (r) => `<span style="padding:3px 10px;border-radius:5px;background:${r.bg};border:1px solid ${r.border};color:${r.color};font-size:12px;font-weight:600;">${r.name}</span>`;
+  document.getElementById('promote-r3-list').innerHTML = r3.map(chip).join('') || '<span style="font-size:12px;color:var(--muted)">ไม่มี</span>';
+  document.getElementById('promote-r2-list').innerHTML = r2.map(r=>`<span style="padding:3px 10px;border-radius:5px;background:#faf5ff;border:1px solid #9333ea;color:#9333ea;font-size:12px;font-weight:600;">${r.name} (R2→R3)</span>`).join('') || '<span style="font-size:12px;color:var(--muted)">ไม่มี</span>';
+  document.getElementById('promote-r1-list').innerHTML = r1.map(r=>`<span style="padding:3px 10px;border-radius:5px;background:#eff6ff;border:1px solid #2563eb;color:#2563eb;font-size:12px;font-weight:600;">${r.name} (R1→R2)</span>`).join('') || '<span style="font-size:12px;color:var(--muted)">ไม่มี</span>';
+  document.getElementById('promote-new-r1').innerHTML = '';
+  document.getElementById('promote-overlay').classList.add('open');
+}
+
+function closePromoteModal() {
+  document.getElementById('promote-overlay').classList.remove('open');
+}
+document.getElementById('promote-overlay').addEventListener('click', e=>{
+  if(e.target===document.getElementById('promote-overlay')) closePromoteModal();
+});
+
+function addNewR1Row() {
+  const tempId = 'new_' + Date.now() + '_' + newR1Rows.length;
+  newR1Rows.push({tempId, name:''});
+  renderNewR1Rows();
+}
+
+function renderNewR1Rows() {
+  document.getElementById('promote-new-r1').innerHTML = newR1Rows.map((row,i)=>`
+    <div style="display:flex;gap:6px;align-items:center;">
+      <input type="text" class="form-ctrl" id="new-r1-${i}" value="${row.name}" placeholder="ชื่อ Resident ปี 1 ใหม่" style="flex:1;font-size:13px;">
+      <button onclick="removeNewR1Row(${i})" style="background:none;border:none;cursor:pointer;color:#94a3b8;font-size:18px;padding:0 4px;">×</button>
+    </div>`).join('');
+}
+
+function removeNewR1Row(i) {
+  newR1Rows.splice(i, 1);
+  renderNewR1Rows();
+}
+
+function confirmPromotion() {
+  // Collect new R1 names
+  newR1Rows.forEach((row, i) => {
+    const el = document.getElementById(`new-r1-${i}`);
+    if (el) row.name = el.value.trim();
+  });
+  const validNewR1 = newR1Rows.filter(r=>r.name);
+
+  // 1. ลบ R3 ออก (save deleted ids)
+  const r3Ids = RES.filter(r=>r.year===3).map(r=>r.id);
+  try {
+    const deleted = JSON.parse(localStorage.getItem('er28_deleted')||'[]');
+    r3Ids.forEach(id=>{ if(!deleted.includes(id)) deleted.push(id); });
+    localStorage.setItem('er28_deleted', JSON.stringify(deleted));
+  } catch(e) {}
+  // Remove from RES
+  for (let i=RES.length-1;i>=0;i--) { if(RES[i].year===3) RES.splice(i,1); }
+
+  // 2. R2 → R3
+  RES.filter(r=>r.year===2).forEach(r=>{ r.year=3; });
+
+  // 3. R1 → R2
+  RES.filter(r=>r.year===1).forEach(r=>{ r.year=2; });
+
+  // 4. เพิ่ม R1 ใหม่
+  const palette1 = COLOR_PALETTES[1];
+  validNewR1.forEach((row, i) => {
+    const maxId = Math.max(...RES.map(r=>parseInt(r.id.replace('r',''))||0), 0);
+    const newId = 'r' + (maxId+1);
+    const p = palette1[i % palette1.length];
+    RES.push({id:newId, name:row.name, year:1, pin:`100${i+1}`, ...p});
+  });
+
+  // 5. บันทึก
+  try {
+    const baseIds = ['r1','r2','r3','r4','r5','r6','r7','r8','r9','r10','r11','r12','r13','r14','r15','r16','r17','r18','r19','r20','r21','r22','r23','r24','r25'];
+    const added = RES.filter(r=>!baseIds.includes(r.id));
+    if (added.length > 0) localStorage.setItem('er28_res', JSON.stringify(added));
+    // บันทึก year changes ใน nameOverrides
+    RES.forEach(r=>{ nameOverrides[r.id+'_year'] = r.year; });
+    localStorage.setItem('er28_names', JSON.stringify(nameOverrides));
+  } catch(e) {}
+
+  closePromoteModal();
+  renderResManageGrid();
+  renderTable();
+  showToast(`✅ เลื่อนชั้นปีแล้ว${validNewR1.length>0?' · เพิ่ม R1 ใหม่ '+validNewR1.length+' คน':''}`, 'ok');
+}
+
+// ============================================================
+// CLEAR ALL DATA
+// ============================================================
+function clearAllData() {
+  if (!confirm('ยืนยันการล้างข้อมูลทั้งหมด?\nตาราง, คำขอลา, และ Rotate ทั้งหมดจะถูกลบทั้ง Local และ Cloud')) return;
+  ['er28_rotates','er28_perRot','er28_hols','er28_deleted','er28_ts'].forEach(k=>localStorage.removeItem(k));
+  rotates=[]; perRot=[];
+  RI=0;
+  // Clear Firestore too
+  if (window._fbSave) window._fbSave([], []);
+  renderEmptyState();
+  showToast('🗑 ล้างข้อมูลทั้งหมดแล้ว — กด "+ Add Rotate" เพื่อเริ่มใหม่','ok');
+}
+
+// ============================================================
+// INIT
+// ============================================================
+function initDefaultRotates() {
+  rotates = []; perRot = [];
+  // เริ่มต้นว่างเปล่า — ให้ user กด Add Rotate เองครับ
+}
+
+function renderEmptyState() {
+  const tbody = document.getElementById('sched-body');
+  if (tbody) tbody.innerHTML = '';
+  const statsRow = document.getElementById('stats-row');
+  if (statsRow) statsRow.innerHTML = '';
+  const rotTitle = document.getElementById('rot-title');
+  if (rotTitle) rotTitle.textContent = 'ยังไม่มี Rotate';
+  const rotSub = document.getElementById('rot-sub');
+  if (rotSub) rotSub.textContent = 'กด "+ Add Rotate" เพื่อเริ่มต้น';
+  renderRotateChips('rotate-chips', -1, 'selectRotate');
+}
+
+(()=>{
+  loadNameOverrides();
+  const loaded = loadState();
+  if (loaded && rotates.length > 0) {
+    RI = 0;
+    renderRotateChips('rotate-chips', RI, 'selectRotate');
+    renderTable();
+    showToast(`✅ โหลดข้อมูล local ${rotates.length} Rotate`, 'ok');
+  } else {
+    rotates = []; perRot = [];
+    RI = 0;
+    renderEmptyState();
+    showToast('👋 กด "+ Add Rotate" เพื่อสร้างรอบแรก', 'ok');
+  }
+  updateUndoRedoBtns();
+
+  // โหลดจาก Firestore (Firebase module อาจโหลดทีหลัง → ฟัง event)
+  if (window._fbReady) {
+    loadFromCloud();
+  } else {
+    window.addEventListener('firebase-ready', () => loadFromCloud(), { once: true });
+  }
+})();
+</script>
+</body>
+</html>
