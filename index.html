@@ -3503,8 +3503,17 @@ function buildSummaryHTML(ri) {
       const sorted = sortAssignedWithLeader(ids, ri);
       const leaderRid = sorted.find(id=>getR(id)?.year<3);
       return sorted.map(id=>{
+        // old outsider system (out_xxx id)
+        const outsider = (perRot[ri].outsiders||[]).find(o=>o.id===id);
+        if (outsider) {
+          return `<span style="display:inline-block;padding:1px 4px;margin:1px 0;border-radius:2px;background:#faf5ff;color:#7c3aed;border:1px solid #a855f7;font-size:${chipFs};font-weight:600;white-space:nowrap;">🏥 ${outsider.name}</span>`;
+        }
         const r=getR(id); if(!r) return '';
         const isL=id===leaderRid;
+        const isOF=isOutsideFlagged(id,ri,d,s);
+        if(isOF) {
+          return `<span style="display:inline-block;padding:1px 4px;margin:1px 0;border-radius:2px;background:#faf5ff;color:#7c3aed;border:1px solid #a855f7;font-size:${chipFs};font-weight:600;white-space:nowrap;">🏥 R${r.year} ${r.name}</span>`;
+        }
         return `<span style="display:inline-block;padding:1px 4px;margin:1px 0;border-radius:2px;background:${r.bg};color:${r.color};border:1px solid ${isL?r.color:r.border};font-size:${chipFs};font-weight:600;white-space:nowrap;${isL?`box-shadow:0 0 0 1px ${r.color}50;`:''}">${isL?'⭐':''}R${r.year} ${r.name}</span>`;
       }).join(' ');
     };
