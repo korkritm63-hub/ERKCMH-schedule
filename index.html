@@ -3874,8 +3874,12 @@ async function exportToExcel() {
     if (!ids.length) return { richText:[{ text:'—', font:{color:{argb:'FFCBD5E1'},size:8,name:'Sarabun'} }] };
     const sorted = sortAssignedWithLeader(ids, ri);
     const leaderRid = sorted.find(id=>getR(id)?.year<3);
+    // EROU (leader) ขึ้นก่อน ตามด้วยคนอื่น
+    const ordered = leaderRid
+      ? [leaderRid, ...sorted.filter(id=>id!==leaderRid)]
+      : sorted;
     const parts = [];
-    sorted.forEach((id,idx)=>{
+    ordered.forEach((id,idx)=>{
       const outsider = (perRot[ri].outsiders||[]).find(o=>o.id===id);
       const sep = idx>0 ? '\n' : '';
       if (outsider) {
