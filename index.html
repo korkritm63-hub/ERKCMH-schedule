@@ -834,7 +834,7 @@ th.col-N{min-width:185px;background:#3b0764;border-left:3px solid #8b5cf6;}
     </div>
     <!-- Paper viewport — scales to fit, scrolls if needed -->
     <div id="preview-viewport" style="flex:1;overflow:auto;-webkit-overflow-scrolling:touch;padding:16px;display:flex;justify-content:flex-start;align-items:flex-start;">
-      <div id="preview-paper" style="background:#fff;width:1123px;min-height:794px;padding:20px 24px;box-shadow:0 8px 40px rgba(0,0,0,.4);font-family:'Sarabun',sans-serif;color:#0f172a;transform-origin:top left;flex-shrink:0;">
+      <div id="preview-paper" style="background:#fff;width:1123px;min-height:794px;padding:10px 14px;box-shadow:0 8px 40px rgba(0,0,0,.4);font-family:'Sarabun',sans-serif;color:#0f172a;transform-origin:top left;flex-shrink:0;">
         <!-- generated content -->
       </div>
     </div>
@@ -3569,39 +3569,41 @@ function buildSummaryHTML(ri) {
 
   // ─── Header ───────────────────────────────────────────────
   let html = `
-  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;border-bottom:2.5px solid #0f172a;padding-bottom:7px;">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:5px;border-bottom:2px solid #0f172a;padding-bottom:4px;">
     <div>
-      <div style="font-size:17px;font-weight:900;color:#0f172a;letter-spacing:-.02em;">ตารางเวร Resident ER</div>
-      <div style="font-size:10px;color:#475569;margin-top:2px;font-weight:500;">โรงพยาบาลจุฬาลงกรณ์ · ${rot.label}</div>
+      <div style="font-size:15px;font-weight:900;color:#0f172a;letter-spacing:-.02em;">ตารางเวร Resident ER</div>
+      <div style="font-size:9px;color:#475569;margin-top:1px;font-weight:500;">โรงพยาบาลจุฬาลงกรณ์ · ${rot.label}</div>
     </div>
     <div style="text-align:right;">
-      <div style="font-size:12px;font-weight:800;color:#dc2626;">${rot.dateRange}</div>
-      <div style="font-size:10px;color:#64748b;margin-top:1px;">รวม ${days} วัน</div>
+      <div style="font-size:11px;font-weight:800;color:#dc2626;">${rot.dateRange}</div>
+      <div style="font-size:9px;color:#64748b;margin-top:1px;">รวม ${days} วัน</div>
     </div>
   </div>`;
 
-  // ─── Main table — full width landscape ────────────────────
-  // คำนวณ font-size ตามจำนวนวัน
-  const rowFs = days > 28 ? '10px' : '11px';
-  const chipFs = days > 28 ? '9.5px' : '10.5px';
+  // ─── Main table — fill landscape height dynamically ────────
+  // header ~34px, tableHeader ~20px, footer ~13px, padding 10×2=20
+  const availH = 794 - 20 - 34 - 20 - 13;
+  const rowH = Math.floor(availH / days);
+  const rowFs = Math.min(13, Math.max(9, Math.round(rowH * 0.52))) + 'px';
+  const chipFs = Math.min(12, Math.max(8, Math.round(rowH * 0.47))) + 'px';
 
   html += `<table style="width:100%;border-collapse:collapse;font-size:${rowFs};table-layout:fixed;">
     <colgroup>
-      <col style="width:20px">
-      <col style="width:48px">
-      <col style="width:20px">
+      <col style="width:16px">
+      <col style="width:46px">
+      <col style="width:16px">
       <col>
       <col>
       <col>
     </colgroup>
     <thead>
       <tr>
-        <th style="background:#0f172a;color:#e2e8f0;padding:4px 2px;border:1px solid #334155;text-align:center;">#</th>
-        <th style="background:#0f172a;color:#e2e8f0;padding:4px;border:1px solid #334155;">วันที่</th>
-        <th style="background:#0f172a;color:#e2e8f0;padding:4px 2px;border:1px solid #334155;text-align:center;">วัน</th>
-        <th style="background:#78350f;color:#fef3c7;padding:4px 6px;border:1px solid #92400e;text-align:center;font-size:11px;">☀ เช้า 08–16</th>
-        <th style="background:#1e3a8a;color:#dbeafe;padding:4px 6px;border:1px solid #1d4ed8;text-align:center;font-size:11px;">🌆 บ่าย 16–24</th>
-        <th style="background:#3b0764;color:#ede9fe;padding:4px 6px;border:1px solid #581c87;text-align:center;font-size:11px;">🌙 ดึก 00–08</th>
+        <th style="background:#0f172a;color:#e2e8f0;padding:3px 2px;border:1px solid #334155;text-align:center;">#</th>
+        <th style="background:#0f172a;color:#e2e8f0;padding:3px 4px;border:1px solid #334155;">วันที่</th>
+        <th style="background:#0f172a;color:#e2e8f0;padding:3px 2px;border:1px solid #334155;text-align:center;">วัน</th>
+        <th style="background:#78350f;color:#fef3c7;padding:3px 6px;border:1px solid #92400e;text-align:center;font-size:${rowFs};">☀ เช้า 08–16</th>
+        <th style="background:#1e3a8a;color:#dbeafe;padding:3px 6px;border:1px solid #1d4ed8;text-align:center;font-size:${rowFs};">🌆 บ่าย 16–24</th>
+        <th style="background:#3b0764;color:#ede9fe;padding:3px 6px;border:1px solid #581c87;text-align:center;font-size:${rowFs};">🌙 ดึก 00–08</th>
       </tr>
     </thead>
     <tbody>`;
@@ -3630,11 +3632,11 @@ function buildSummaryHTML(ri) {
         // old outsider system (out_xxx id)
         const outsider = (perRot[ri].outsiders||[]).find(o=>o.id===id);
         if (outsider) {
-          return `<span style="display:inline-block;padding:2px 5px;margin:1px 0;border-radius:2px;background:#faf5ff;color:#7c3aed;border:1px solid #a855f7;font-size:${chipFs};font-weight:600;white-space:nowrap;">🏥 ${outsider.name}</span>`;
+          return `<span style="display:inline-block;padding:1px 4px;margin:1px 0;border-radius:2px;background:#faf5ff;color:#7c3aed;border:1px solid #a855f7;font-size:${chipFs};font-weight:600;white-space:nowrap;">🏥 ${outsider.name}</span>`;
         }
         const r=getR(id); if(!r) return '';
         const isL=id===leaderRid;
-        return `<span style="display:inline-block;padding:2px 5px;margin:1px 0;border-radius:2px;background:${r.bg};color:${r.color};border:1px solid ${isL?r.color:r.border};font-size:${chipFs};font-weight:600;white-space:nowrap;${isL?`box-shadow:0 0 0 1px ${r.color}50;`:''}">${isL?'⭐':''}R${r.year} ${r.name}</span>`;
+        return `<span style="display:inline-block;padding:1px 4px;margin:1px 0;border-radius:2px;background:${r.bg};color:${r.color};border:1px solid ${isL?r.color:r.border};font-size:${chipFs};font-weight:600;white-space:nowrap;${isL?`box-shadow:0 0 0 1px ${r.color}50;`:''}">${isL?'⭐':''}R${r.year} ${r.name}</span>`;
       }).join(' ');
     };
 
@@ -3642,10 +3644,10 @@ function buildSummaryHTML(ri) {
       ? `style="border:1px solid #93c5fd;background:repeating-linear-gradient(135deg,#fefce8,#fefce8 6px,#fef9c3 6px,#fef9c3 12px);vertical-align:top;padding:2px 3px;position:relative;"`
       : `style="border:1px solid #e2e8f0;vertical-align:top;padding:2px 3px;"`;
 
-    html += `<tr style="background:${rowBg};">
-      <td style="border:1px solid #e2e8f0;padding:2px;text-align:center;color:#94a3b8;font-family:monospace;">${d}</td>
-      <td style="border:1px solid #e2e8f0;padding:2px 3px;background:${dayBg};color:${dayCol};font-weight:700;white-space:nowrap;">${dt.getDate()} ${TH_MONTHS[dt.getMonth()+1]}${isSp?' 🌟':''}</td>
-      <td style="border:1px solid #e2e8f0;padding:2px;text-align:center;color:${dayCol};font-weight:600;">${DOW_EN[wd]}${isConf?'<br><span style="font-size:5px;color:#1d4ed8;">📋</span>':''}</td>
+    html += `<tr style="background:${rowBg};height:${rowH}px;">
+      <td style="border:1px solid #e2e8f0;padding:2px;text-align:center;color:#94a3b8;font-family:monospace;vertical-align:middle;">${d}</td>
+      <td style="border:1px solid #e2e8f0;padding:2px 3px;background:${dayBg};color:${dayCol};font-weight:700;white-space:nowrap;vertical-align:middle;">${dt.getDate()} ${TH_MONTHS[dt.getMonth()+1]}${isSp?' 🌟':''}</td>
+      <td style="border:1px solid #e2e8f0;padding:2px;text-align:center;color:${dayCol};font-weight:600;vertical-align:middle;">${DOW_EN[wd]}${isConf?'<br><span style="font-size:5px;color:#1d4ed8;">📋</span>':''}</td>
       <td ${confCell}>${renderShift('M')}${isConf?'<span style="position:absolute;top:1px;right:2px;font-size:5px;color:#b45309;font-weight:700;">max3</span>':''}</td>
       <td style="border:1px solid #e2e8f0;vertical-align:top;padding:2px 3px;">${renderShift('A')}</td>
       <td style="border:1px solid #e2e8f0;vertical-align:top;padding:2px 3px;">${renderShift('N')}</td>
@@ -3654,7 +3656,7 @@ function buildSummaryHTML(ri) {
   html += `</tbody></table>`;
 
   // ─── Footer ───────────────────────────────────────────────
-  html+=`<div style="margin-top:6px;font-size:7px;color:#94a3b8;text-align:right;border-top:1px solid #e2e8f0;padding-top:4px;">
+  html+=`<div style="margin-top:3px;font-size:7px;color:#94a3b8;text-align:right;border-top:1px solid #e2e8f0;padding-top:2px;">
     Generated: ${new Date().toLocaleString('th-TH')} · ER Resident Scheduler v4 · ⭐ = EROU
   </div>`;
 
@@ -3739,7 +3741,7 @@ function printPreview() {
     <title>ตารางเวร ER ${rot.label}</title>
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700;800&display=swap" rel="stylesheet">
     <style>
-      @page{size:A4 landscape;margin:8mm;}
+      @page{size:A4 landscape;margin:5mm;}
       body{margin:0;padding:0;font-family:Sarabun,sans-serif;color:#0f172a;}
       @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}
     </style>
