@@ -694,7 +694,7 @@ th.col-N{min-width:185px;background:#3b0764;border-left:3px solid #8b5cf6;}
   <!-- ADMIN PIN -->
   <div style="background:#fff;border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:20px;">
     <div style="padding:14px 20px;border-bottom:1px solid var(--border);font-weight:700;font-size:14px;">👑 Admin PIN — ป้องกันการแก้ตารางเวร</div>
-    <div style="padding:16px 20px;" id="admin-pin-settings"></div>
+    <div style="padding:16px 20px;font-size:13px;color:var(--muted);">🔒 ระบบใช้รหัสคงที่ — กด <b style="color:var(--text)">🔒 Admin</b> มุมบนขวาเพื่อเข้าสู่ระบบ</div>
   </div>
 
   <!-- MANAGE RESIDENTS -->
@@ -1313,8 +1313,14 @@ function nextRotateStart(ri) {
 let _fbSaveTimer = null;
 let _fbListenTimer = null;
 let _pendingCloudData = null;
-let _globalAdminPin = localStorage.getItem('er28_adminPin') || '';
+const _globalAdminPin = btoa('210438');
 let _isAdminSession = false;
+let _shiftCntCache = null;
+function getCachedShiftCnt(rid, ri) {
+  if (!_shiftCntCache) _shiftCntCache = {};
+  const k = `${ri}:${rid}`;
+  return _shiftCntCache[k] || (_shiftCntCache[k] = shiftCntByType(rid, ri));
+}
 function saveState() {
   try {
     // Save rotates with full info: startStr + endStr + customLabel
@@ -1331,8 +1337,7 @@ function saveState() {
       if (window._fbReady && window._fbSave) {
         const ok = await window._fbSave(
           rotatesMeta,
-          JSON.parse(JSON.stringify(perRot)),
-          _globalAdminPin
+          JSON.parse(JSON.stringify(perRot))
         );
         setSaveInd(ok);
         if (!ok) showToast('⚠ Cloud save ล้มเหลว (บันทึกเฉพาะ local)','err');
@@ -1411,10 +1416,6 @@ function applyCloudData(data) {
     localStorage.setItem('er28_rotates', JSON.stringify(data.rotates));
     localStorage.setItem('er28_perRot', JSON.stringify(data.perRot));
     localStorage.setItem('er28_ts', String(data.updatedAt||Date.now()));
-    if (data.adminPin !== undefined && data.adminPin !== _globalAdminPin) {
-      _globalAdminPin = data.adminPin || '';
-      localStorage.setItem('er28_adminPin', _globalAdminPin);
-    }
     loadState();
     renderRotateChips('rotate-chips', RI, 'selectRotate');
     renderTable();
@@ -1827,30 +1828,23 @@ function exitAdminSession() {
 function updateAdminUI() {
   const btn = document.getElementById('admin-nav-btn');
   if (btn) {
-    if (!_globalAdminPin) {
-      btn.style.display = 'none';
+    btn.style.display = '';
+    if (_isAdminSession) {
+      btn.textContent = '👑 Admin';
+      btn.style.cssText='background:#ef4444;color:#fff;border-radius:6px;border:none;padding:5px 12px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;';
+      btn.onclick = exitAdminSession;
     } else {
-      btn.style.display = '';
-      if (_isAdminSession) {
-        btn.textContent = '👑 Admin';
-        btn.style.cssText='background:#ef4444;color:#fff;border-radius:6px;border:none;padding:5px 12px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;';
-        btn.onclick = exitAdminSession;
-      } else {
-        btn.textContent = '🔒 Admin';
-        btn.style.cssText='background:transparent;color:#94a3b8;border-radius:6px;border:1px solid #475569;padding:5px 12px;font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;';
-        btn.onclick = () => {
-          document.getElementById('admin-pin-input').value = '';
-          document.getElementById('admin-login-err').style.display = 'none';
-          document.getElementById('admin-modal').classList.add('open');
-        };
-      }
+      btn.textContent = '🔒 Admin';
+      btn.style.cssText='background:transparent;color:#94a3b8;border-radius:6px;border:1px solid #475569;padding:5px 12px;font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;';
+      btn.onclick = () => {
+        document.getElementById('admin-pin-input').value = '';
+        document.getElementById('admin-login-err').style.display = 'none';
+        document.getElementById('admin-modal').classList.add('open');
+      };
     }
   }
-  // dayoff lock button — show only to admin
   const dlBtn = document.getElementById('dayoff-lock-btn');
   if (dlBtn) dlBtn.style.display = isAdminMode() ? '' : 'none';
-  // re-render settings PIN card if open
-  if (document.getElementById('tab-settings')?.classList.contains('active')) renderAdminPinSettings();
 }
 
 function toggleDayoffLock() {
@@ -1873,62 +1867,6 @@ function renderDayoffLockUI() {
     btn.style.borderColor = locked ? '#f97316' : '';
     btn.style.color = locked ? '#ea580c' : '';
   }
-}
-
-function renderAdminPinSettings() {
-  const el = document.getElementById('admin-pin-settings');
-  if (!el) return;
-  if (_globalAdminPin) {
-    el.innerHTML = `
-      <div style="font-size:12px;color:#16a34a;margin-bottom:12px;">✅ มีรหัส Admin ตั้งแล้ว${_isAdminSession ? ' · <b>กำลัง Admin mode อยู่</b>' : ' · ยังไม่ได้ล็อกอิน'}</div>
-      ${isAdminMode() ? `
-      <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">เมื่อมีรหัส Admin — เฉพาะ Admin เท่านั้นที่แก้ตารางเวรได้ ทุกคนยังเพิ่ม Day off ได้ตามปกติ</div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;">
-        <button class="btn btn-outline btn-sm" onclick="showChangeAdminPin()">🔑 เปลี่ยนรหัส</button>
-        <button class="btn btn-outline btn-sm" style="color:#dc2626;border-color:#fca5a5" onclick="removeAdminPin()">🗑 ลบรหัส Admin</button>
-      </div>
-      <div id="change-admin-pin-form" style="display:none;margin-top:14px;">
-        <div class="form-group"><label class="form-label">รหัสใหม่</label><input type="password" class="form-ctrl" id="new-admin-pin" placeholder="รหัสใหม่"></div>
-        <div class="form-group"><label class="form-label">ยืนยันรหัส</label><input type="password" class="form-ctrl" id="confirm-admin-pin" placeholder="ยืนยัน"></div>
-        <button class="btn btn-red btn-sm" onclick="saveAdminPin()">💾 บันทึกรหัสใหม่</button>
-      </div>` : `<div style="font-size:12px;color:var(--muted);">กด 🔒 Admin (มุมบนขวา) เพื่อล็อกอินก่อน</div>`}
-    `;
-  } else {
-    el.innerHTML = `
-      <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">ยังไม่มีรหัส Admin — ทุกคนแก้ตารางได้ ตั้งรหัสเพื่อจำกัดสิทธิ์</div>
-      <div class="form-group"><label class="form-label">รหัส Admin ใหม่</label><input type="password" class="form-ctrl" id="new-admin-pin" placeholder="ตั้งรหัส..."></div>
-      <div class="form-group"><label class="form-label">ยืนยันรหัส</label><input type="password" class="form-ctrl" id="confirm-admin-pin" placeholder="ยืนยัน..."></div>
-      <button class="btn btn-red" onclick="saveAdminPin()">👑 ตั้งรหัส Admin</button>
-    `;
-  }
-}
-
-function showChangeAdminPin() {
-  const f = document.getElementById('change-admin-pin-form');
-  if (f) f.style.display = f.style.display === 'none' ? '' : 'none';
-}
-
-function saveAdminPin() {
-  const pin = document.getElementById('new-admin-pin')?.value.trim();
-  const confirm = document.getElementById('confirm-admin-pin')?.value.trim();
-  if (!pin) { showToast('⚠ กรุณาใส่รหัส', 'err'); return; }
-  if (pin !== confirm) { showToast('⚠ รหัสไม่ตรงกัน', 'err'); return; }
-  _globalAdminPin = btoa(pin);
-  _isAdminSession = true;
-  localStorage.setItem('er28_adminPin', _globalAdminPin);
-  saveState();
-  updateAdminUI();
-  showToast('✅ ตั้งรหัส Admin แล้ว — Admin mode เปิดอยู่', 'ok');
-}
-
-function removeAdminPin() {
-  if (!confirm('ลบรหัส Admin ออก? ทุกคนจะแก้ตารางได้')) return;
-  _globalAdminPin = '';
-  _isAdminSession = false;
-  localStorage.setItem('er28_adminPin', '');
-  saveState();
-  updateAdminUI();
-  showToast('✅ ลบรหัส Admin แล้ว', 'ok');
 }
 
 function guardLocked() {
@@ -2777,8 +2715,9 @@ function selectRotate(i){
 // ============================================================
 function renderTable(){
   if (!rotates.length) { renderEmptyState(); return; }
+  _shiftCntCache = null;
   const ri=RI, rot=rotates[ri];
-  invalidateLeaderCache(ri); // rebuild leader cache สำหรับ rotate นี้
+  invalidateLeaderCache(ri);
   updateLockUI(); // update lock state
   document.getElementById('rot-title').textContent=`${rot.label}`;
   document.getElementById('rot-sub').textContent=`${rot.dateRange} · ${rot.days||28} DAYS`;
@@ -2874,7 +2813,8 @@ function renderTable(){
         chip.innerHTML = isOF
           ? `<span style="width:6px;height:6px;border-radius:50%;background:#a855f7;flex-shrink:0;display:inline-block"></span>🏥 ${displayName(r)}`
           : `<span style="width:6px;height:6px;border-radius:50%;background:${isSp?'#f59e0b':r.color};flex-shrink:0;display:inline-block"></span>${icon}${isLeader?'⭐ ':''}${displayName(r)}`;
-        chip.title=`${isOF?'🏥 วนนอกแผนก · ':''}${isLeader?'👑 หัวหน้าเวร (EROU) · ':''}${r.name} ปี ${r.year} | M:${shiftCntByType(rid,ri).M} A:${shiftCntByType(rid,ri).A} N:${shiftCntByType(rid,ri).N}`;
+        const sct=getCachedShiftCnt(rid,ri);
+        chip.title=`${isOF?'🏥 วนนอกแผนก · ':''}${isLeader?'👑 หัวหน้าเวร (EROU) · ':''}${r.name} ปี ${r.year} | M:${sct.M} A:${sct.A} N:${sct.N}`;
         chip.onmouseenter=()=>{chip.style.filter='brightness(0.9)';chip.style.transform='translateX(1px)';};
         chip.onmouseleave=()=>{chip.style.filter='';chip.style.transform='';};
         chip.onclick=()=>openModal(d,shift);
@@ -2908,13 +2848,14 @@ function renderTable(){
       const ft=document.createElement('div');
       ft.className='shift-footer';
       const cc=cnt>=3?'cnt-ok':cnt>0?'cnt-warn':'cnt-err';
-      ft.innerHTML=`<span class="cnt-badge ${cc}">${cnt} คน</span>`;
-      if(isSp) ft.innerHTML+=`<span class="flag flag-green">🌟</span>`;
-      if(constErr.length>0) ft.innerHTML+=`<span class="flag flag-err">⛔</span>`;
-      if(softV.length>0) ft.innerHTML+=`<span class="flag flag-warn">😴</span>`;
-      if(cnt>0&&cnt<3) ft.innerHTML+=`<span class="flag flag-warn">⚠ขาด</span>`;
-      if(shift==='M'&&isTu&&cnt>3) ft.innerHTML+=`<span class="flag flag-warn">⚠เกิน</span>`;
-      if(!sOk&&cnt>0) ft.innerHTML+=`<span class="flag flag-purple">⚠senior</span>`;
+      let ftHtml=`<span class="cnt-badge ${cc}">${cnt} คน</span>`;
+      if(isSp) ftHtml+=`<span class="flag flag-green">🌟</span>`;
+      if(constErr.length>0) ftHtml+=`<span class="flag flag-err">⛔</span>`;
+      if(softV.length>0) ftHtml+=`<span class="flag flag-warn">😴</span>`;
+      if(cnt>0&&cnt<3) ftHtml+=`<span class="flag flag-warn">⚠ขาด</span>`;
+      if(shift==='M'&&isTu&&cnt>3) ftHtml+=`<span class="flag flag-warn">⚠เกิน</span>`;
+      if(!sOk&&cnt>0) ftHtml+=`<span class="flag flag-purple">⚠senior</span>`;
+      ft.innerHTML=ftHtml;
       td.appendChild(ft);
       tr.appendChild(td);
     }
@@ -2935,11 +2876,10 @@ function updateStats(){
     }
   }
   const tot={1:0,2:0,3:0};
-  ar.forEach(r=>{ tot[r.year]+=shiftCnt(r.id,ri); });
+  ar.forEach(r=>{ tot[r.year]+=getCachedShiftCnt(r.id,ri).total; });
   const totalShifts = tot[1]+tot[2]+tot[3];
-  // เวรรวมเป้าหมาย = sum of all active residents' quota
   const targetShifts = ar.reduce((s,r)=>s+QUOTA[r.year],0);
-  const spreads=ar.map(r=>{ const c=shiftCntByType(r.id,ri); return Math.max(c.M,c.A,c.N)-Math.min(c.M,c.A,c.N); });
+  const spreads=ar.map(r=>{ const c=getCachedShiftCnt(r.id,ri); return Math.max(c.M,c.A,c.N)-Math.min(c.M,c.A,c.N); });
   const maxSp=spreads.length?Math.max(...spreads):0;
   const holCnts=ar.map(r=>holShiftCnt(r.id,ri));
   const holSp=holCnts.length?Math.max(...holCnts,0)-Math.min(...holCnts,0):0;
@@ -3421,7 +3361,6 @@ function openModal(d,shift){
     const isDouble=!isSel&&!hard&&!unav&&alreadyToday(r.id,ri,d);
     const blocked=unav||hard;
     const sp=softPenalty(r.id,ri,d,shift);
-    const c=shiftCntByType(r.id,ri);
     const item=document.createElement('div');
     item.className='pick-item'+(isSel?' selected':'')+(blocked?' unavail':'')+(isDouble?' double-shift':'');
     if(!blocked&&!isSel&&!isDouble) item.style.borderLeft=`3px solid ${r.color}`;
@@ -3439,7 +3378,7 @@ function openModal(d,shift){
     } else {
       const sp=softPenalty(r.id,ri,d,shift);
       const w=sp>=10?'😴':sp>=8?'😓':'';
-      const ct=shiftCntByType(r.id,ri);
+      const ct=getCachedShiftCnt(r.id,ri);
       meta=`${w?w+' ':''}M:${ct.M} A:${ct.A} N:${ct.N} | รวม:${ct.total}/${QUOTA[r.year]}`;
     }
 
@@ -3604,7 +3543,7 @@ function switchTab(tab,btn){
   if(tab==='residents') renderResGrid();
   if(tab==='leaves'){ renderLeaveSelect(); renderLeaveList(); renderDayoffLockUI(); updateAdminUI(); }
   if(tab==='fairness') renderFairness();
-  if(tab==='settings'){ renderResManageGrid(); renderConfDays(); renderICalButtons(); renderAdminPinSettings(); }
+  if(tab==='settings'){ renderResManageGrid(); renderConfDays(); renderICalButtons(); }
 }
 function renderAll(){
   renderRotateChips('rotate-chips',RI,'selectRotate');
