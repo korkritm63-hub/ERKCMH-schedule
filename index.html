@@ -20,6 +20,7 @@
 <title>ER Resident Scheduler — จุฬาฯ v4</title>
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.3.0/dist/exceljs.min.js"></script>
 
 <!-- Firebase SDK -->
 <script type="module">
@@ -538,6 +539,7 @@ th.col-N{min-width:185px;background:#3b0764;border-left:3px solid #8b5cf6;}
         <button class="more-action-item" onclick="redoSchedule();closeMoreActions()" id="btn-redo">↷ Redo</button>
         <div style="height:1px;background:var(--border);margin:2px 0;"></div>
         <button class="more-action-item" onclick="openSummaryPreview();closeMoreActions()">📋 Preview A4</button>
+        <button class="more-action-item" onclick="exportToExcel();closeMoreActions()">📊 Export Excel</button>
         <button class="more-action-item" onclick="clearSchedule();closeMoreActions()">🗑 ล้างตาราง</button>
         <div style="height:1px;background:var(--border);margin:2px 0;"></div>
         <button class="more-action-item" id="more-btn-lock" onclick="toggleLock();closeMoreActions()">🔒 ล็อก Rotate</button>
@@ -3784,6 +3786,209 @@ function printPreview() {
 document.getElementById('preview-overlay').addEventListener('click', e=>{
   if(e.target===document.getElementById('preview-overlay')) closeSummaryPreview();
 });
+
+// ============================================================
+// EXCEL EXPORT
+// ============================================================
+function cssToArgb(css) {
+  if (!css) return 'FFFFFFFF';
+  const h = css.replace('#','');
+  if (h.length===3) return 'FF'+h[0]+h[0]+h[1]+h[1]+h[2]+h[2];
+  return 'FF'+h.slice(0,6).toUpperCase();
+}
+
+async function exportToExcel() {
+  if (!rotates.length) { showToast('⚠ ยังไม่มี Rotate','err'); return; }
+  if (!window.ExcelJS) { showToast('⚠ ยังโหลด ExcelJS ไม่เสร็จ — รอสักครู่','err'); return; }
+
+  showToast('📊 กำลัง Export...','ok');
+  const ri = RI, rot = rotates[ri], days = rotDays(ri);
+  const ar = activeRes(ri).sort((a,b)=>b.year-a.year||a.name.localeCompare(b.name));
+
+  // ── หา max residents per shift ───────────────────────────────
+  let maxM=1, maxA=1, maxN=1;
+  for (let d=1; d<=days; d++) {
+    maxM = Math.max(maxM, (perRot[ri].sched[d]?.M||[]).length);
+    maxA = Math.max(maxA, (perRot[ri].sched[d]?.A||[]).length);
+    maxN = Math.max(maxN, (perRot[ri].sched[d]?.N||[]).length);
+  }
+
+  // ── column positions ─────────────────────────────────────────
+  const C_DOW  = 1, C_DATE = 2;
+  const C_M    = 3;
+  const C_A    = C_M + maxM;
+  const C_N    = C_A + maxA;
+  const C_STAT = C_N + maxN + 1; // gap=1
+
+  const wb = new ExcelJS.Workbook();
+  wb.creator = 'ER Resident Scheduler';
+  const ws = wb.addWorksheet(rot.label.replace(/[:\\/?*[\]]/g,'_'), {
+    views: [{ state:'frozen', xSplit:2, ySplit:3 }]
+  });
+
+  // ── helper: style header cell ─────────────────────────────────
+  const H = (r,c,val,bg='FF1E3A5F',fc='FFFFFFFF',sz=10,bold=true) => {
+    const cell = ws.getCell(r,c);
+    cell.value = val;
+    cell.font  = { bold, size:sz, name:'Sarabun', color:{argb:fc} };
+    cell.fill  = { type:'pattern', pattern:'solid', fgColor:{argb:bg} };
+    cell.alignment = { horizontal:'center', vertical:'middle', wrapText:true };
+    cell.border = { top:{style:'thin',color:{argb:'FFB0B0B0'}}, left:{style:'thin',color:{argb:'FFB0B0B0'}}, bottom:{style:'thin',color:{argb:'FFB0B0B0'}}, right:{style:'thin',color:{argb:'FFB0B0B0'}} };
+  };
+  const D = (r,c,val,bg,fc='FF0F172A',bold=false,align='center') => {
+    const cell = ws.getCell(r,c);
+    cell.value = val;
+    cell.font  = { bold, size:10, name:'Sarabun', color:{argb:fc} };
+    if (bg) cell.fill = { type:'pattern', pattern:'solid', fgColor:{argb:bg} };
+    cell.alignment = { horizontal:align, vertical:'middle' };
+    cell.border = { bottom:{style:'hair',color:{argb:'FFDDDDDD'}}, right:{style:'hair',color:{argb:'FFDDDDDD'}} };
+  };
+
+  // ── Row 1: Title ──────────────────────────────────────────────
+  ws.mergeCells(1,1,1,C_N+maxN-1);
+  H(1,1, `ตารางเวร แพทย์ประจำบ้าน ${rot.label}  (${rot.dateRange})`, 'FF1E3A5F','FFFFFFFF',12);
+  ws.getRow(1).height = 24;
+
+  // ── Row 2: Shift group headers ────────────────────────────────
+  ws.mergeCells(2,C_DOW,2,C_DATE);
+  H(2,C_DOW,'','FF374151','FFFFFFFF');
+  ws.mergeCells(2,C_M,2,C_M+maxM-1);
+  H(2,C_M,'☀  เวรเช้า  8:00 – 16:00','FFFEF9C3','FF92400E');
+  ws.mergeCells(2,C_A,2,C_A+maxA-1);
+  H(2,C_A,'🌆  เวรบ่าย  16:00 – 0:00','FFFED7AA','FF9A3412');
+  ws.mergeCells(2,C_N,2,C_N+maxN-1);
+  H(2,C_N,'🌙  เวรดึก  0:00 – 8:00','FFEFF6FF','FF1E3A8A');
+  ws.getRow(2).height = 20;
+
+  // ── Row 3: Column sub-headers ─────────────────────────────────
+  H(3,C_DOW,'วัน','FF4B5563','FFFFFFFF',9);
+  H(3,C_DATE,'วันที่','FF4B5563','FFFFFFFF',9);
+  for (let i=0;i<maxM;i++) H(3,C_M+i,`เช้า ${i+1}`,'FFFEF9C3','FF92400E',9);
+  for (let i=0;i<maxA;i++) H(3,C_A+i,`บ่าย ${i+1}`,'FFFED7AA','FF9A3412',9);
+  for (let i=0;i<maxN;i++) H(3,C_N+i,`ดึก ${i+1}`,'FFEFF6FF','FF1E3A8A',9);
+  ws.getRow(3).height = 16;
+
+  // Stats header
+  H(3,C_STAT,  'ชื่อ',  'FF374151','FFFFFFFF',9);
+  H(3,C_STAT+1,'ปี',   'FF374151','FFFFFFFF',9);
+  H(3,C_STAT+2,'เช้า M','FFFEF9C3','FF92400E',9);
+  H(3,C_STAT+3,'บ่าย A','FFFED7AA','FF9A3412',9);
+  H(3,C_STAT+4,'ดึก N', 'FFEFF6FF','FF1E3A8A',9);
+  H(3,C_STAT+5,'รวม',  'FFE5E7EB','FF111827',9);
+
+  // ── Column widths ─────────────────────────────────────────────
+  ws.getColumn(C_DOW).width  = 5;
+  ws.getColumn(C_DATE).width = 10;
+  for (let i=0;i<maxM;i++) ws.getColumn(C_M+i).width = 12;
+  for (let i=0;i<maxA;i++) ws.getColumn(C_A+i).width = 12;
+  for (let i=0;i<maxN;i++) ws.getColumn(C_N+i).width = 12;
+  ws.getColumn(C_STAT).width   = 14;
+  ws.getColumn(C_STAT+1).width = 4;
+  ws.getColumn(C_STAT+2).width = 7;
+  ws.getColumn(C_STAT+3).width = 7;
+  ws.getColumn(C_STAT+4).width = 7;
+  ws.getColumn(C_STAT+5).width = 7;
+
+  // ── Thai month abbrev ─────────────────────────────────────────
+  const MO = ['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+  const DOW_TH = ['อา','จ','อ','พ','พฤ','ศ','ส'];
+
+  // ── Data rows ─────────────────────────────────────────────────
+  for (let d=1; d<=days; d++) {
+    const dt  = rotDay(ri,d);
+    const wd  = dt.getDay();
+    const isWk  = wd===0||wd===6;
+    const isTu  = wd===2;
+    const isHol = isHoliday(ri,d);
+    const isSp  = isWk||isHol;
+    const row   = d + 3; // row 4 = day 1
+    ws.getRow(row).height = 17;
+
+    // Row background
+    let rowBg = 'FFFFFFFF';
+    if (isHol && !isWk) rowBg = 'FFFCE7F3';
+    else if (isWk)      rowBg = 'FFFFF1F2';
+    else if (isTu)      rowBg = 'FFFEFCE8';
+
+    // DOW
+    D(row,C_DOW, DOW_TH[wd], rowBg,
+      isWk?'FFDC2626':isTu?'FFD97706':'FF374151', isSp);
+    ws.getCell(row,C_DOW).border = { right:{style:'thin',color:{argb:'FFAAAAAA'}}, bottom:{style:'hair',color:{argb:'FFDDDDDD'}} };
+
+    // Date
+    D(row,C_DATE, `${dt.getDate()} ${MO[dt.getMonth()+1]}`, rowBg,
+      isWk?'FFDC2626':'FF0F172A', isSp);
+    ws.getCell(row,C_DATE).border = { right:{style:'medium',color:{argb:'FF888888'}}, bottom:{style:'hair',color:{argb:'FFDDDDDD'}} };
+
+    // Fill shift cells helper
+    const fillShift = (colStart, maxCols, borderArgb) => {
+      const sKey = colStart===C_M?'M':colStart===C_A?'A':'N';
+      const assigned = sortAssignedWithLeader(perRot[ri].sched[d]?.[sKey]||[], ri);
+      for (let i=0; i<maxCols; i++) {
+        const rid  = assigned[i];
+        const cell = ws.getCell(row, colStart+i);
+        cell.alignment = { horizontal:'center', vertical:'middle' };
+        const isLastInGroup = (i === maxCols-1);
+        cell.border = {
+          bottom: { style:'hair', color:{argb:'FFDDDDDD'} },
+          right:  { style: isLastInGroup?'medium':'hair', color:{argb: isLastInGroup?borderArgb:'FFDDDDDD'} },
+          left:   i===0 ? {style:'medium',color:{argb:borderArgb}} : {style:'hair',color:{argb:'FFDDDDDD'}}
+        };
+        if (!rid) {
+          cell.fill = { type:'pattern', pattern:'solid', fgColor:{argb:rowBg} };
+          cell.value = '';
+          continue;
+        }
+        const outsider = (perRot[ri].outsiders||[]).find(o=>o.id===rid);
+        if (outsider) {
+          cell.value = outsider.name;
+          cell.fill  = { type:'pattern', pattern:'solid', fgColor:{argb:'FFF3E8FF'} };
+          cell.font  = { size:10, name:'Sarabun', bold:true, color:{argb:'FF7C3AED'} };
+        } else {
+          const r = getR(rid);
+          if (!r) { cell.value=''; cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:rowBg}}; continue; }
+          cell.value = r.name;
+          cell.fill  = { type:'pattern', pattern:'solid', fgColor:{argb: isSp ? cssToArgb(r.border||r.bg) : cssToArgb(r.bg)} };
+          cell.font  = { size:10, name:'Sarabun', bold: isSp, color:{argb:cssToArgb(r.color)} };
+        }
+      }
+    };
+
+    fillShift(C_M, maxM, 'FFD97706');
+    fillShift(C_A, maxA, 'FFEA580C');
+    fillShift(C_N, maxN, 'FF1D4ED8');
+  }
+
+  // ── Stats (right side, rows 4+) ───────────────────────────────
+  ar.forEach((r, idx) => {
+    const row = idx + 4;
+    const cnt = shiftCntByType(r.id, ri);
+    const bg  = cssToArgb(r.bg);
+    const fg  = cssToArgb(r.color);
+    D(row, C_STAT,   r.name,    bg, fg, true, 'left');
+    D(row, C_STAT+1, r.year,    'FFF8FAFC','FF374151');
+    D(row, C_STAT+2, cnt.M,     'FFFEF9C3','FF92400E', true);
+    D(row, C_STAT+3, cnt.A,     'FFFED7AA','FF9A3412', true);
+    D(row, C_STAT+4, cnt.N,     'FFEFF6FF','FF1E3A8A', true);
+    D(row, C_STAT+5, cnt.total, 'FFF1F5F9','FF0F172A', true);
+  });
+
+  // ── Generate & download ───────────────────────────────────────
+  try {
+    const buf  = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buf], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url;
+    a.download = `${rot.label.replace(/\s+/g,'_')}.xlsx`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('✅ Export Excel สำเร็จ','ok');
+  } catch(e) {
+    console.error('Excel export error', e);
+    showToast('⚠ Export ล้มเหลว — ดู console','err');
+  }
+}
 
 // ============================================================
 // CONFERENCE DAYS
