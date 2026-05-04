@@ -40,9 +40,9 @@ const db = getFirestore(app);
 const SCHED_DOC = doc(db, 'scheduler', 'main');
 
 // ── Save to Firestore ─────────────────────────────────────────
-window._fbSave = async (rotatesData, perRotData) => {
+window._fbSave = async (rotatesData, perRotData, adminPin='') => {
   try {
-    await setDoc(SCHED_DOC, { rotates: rotatesData, perRot: perRotData, updatedAt: Date.now() }, { merge: false });
+    await setDoc(SCHED_DOC, { rotates: rotatesData, perRot: perRotData, adminPin, updatedAt: Date.now() }, { merge: false });
     return true;
   } catch(e) { console.error('Firebase save error', e); return false; }
 };
@@ -505,7 +505,8 @@ th.col-N{min-width:185px;background:#3b0764;border-left:3px solid #8b5cf6;}
   </div>
   <div style="display:flex;align-items:center;gap:10px">
     <div class="save-ind" id="save-ind"><div class="save-dot" style="background:#22c55e"></div><span>บันทึกแล้ว</span></div>
-    <div style="display:flex;gap:5px">
+    <div style="display:flex;gap:5px;align-items:center">
+      <button id="admin-nav-btn" class="nav-btn" style="display:none" title="Admin mode">🔒 Admin</button>
       <button class="nav-btn active" onclick="switchTab('schedule',this)">📅 ตาราง</button>
       <button class="nav-btn" onclick="switchTab('residents',this)">👨‍⚕️ Residents</button>
       <button class="nav-btn" onclick="switchTab('leaves',this)">📋 Dayoff</button>
@@ -620,11 +621,17 @@ th.col-N{min-width:185px;background:#3b0764;border-left:3px solid #8b5cf6;}
 <div id="tab-leaves" class="tab-content">
   <div class="toolbar" style="margin-bottom:16px">
     <div class="toolbar-left"><div class="page-title">Dayoff — <span id="lv-rot-label">-</span></div></div>
+    <button id="dayoff-lock-btn" class="btn btn-outline btn-sm" onclick="toggleDayoffLock()" style="display:none">🔒 ล็อก Day off</button>
   </div>
   <!-- Lock banner (shared state with schedule tab) -->
   <div id="leave-lock-banner" style="display:none;align-items:center;gap:10px;background:#fef3c7;border:1px solid #fde68a;border-radius:10px;padding:10px 16px;margin-bottom:12px;">
     <span style="font-size:18px;">🔒</span>
     <div style="font-size:13px;color:#92400e;font-weight:600;">Rotate นี้ถูกล็อก — ไม่สามารถเพิ่ม/ลบ Dayoff ได้</div>
+  </div>
+  <!-- Dayoff lock banner (admin-controlled) -->
+  <div id="dayoff-lock-banner" style="display:none;align-items:center;gap:10px;background:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:10px 16px;margin-bottom:12px;">
+    <span style="font-size:18px;">🔒</span>
+    <div style="font-size:13px;color:#991b1b;font-weight:600;">Admin ปิดรับ Day off แล้ว — ไม่สามารถเพิ่ม/ลบได้</div>
   </div>
   <div class="lv-grid">
     <div class="lv-form">
@@ -682,6 +689,12 @@ th.col-N{min-width:185px;background:#3b0764;border-left:3px solid #8b5cf6;}
 <div id="tab-settings" class="tab-content">
   <div class="toolbar" style="margin-bottom:16px">
     <div class="toolbar-left"><div class="page-title">⚙️ ตั้งค่าระบบ</div></div>
+  </div>
+
+  <!-- ADMIN PIN -->
+  <div style="background:#fff;border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:20px;">
+    <div style="padding:14px 20px;border-bottom:1px solid var(--border);font-weight:700;font-size:14px;">👑 Admin PIN — ป้องกันการแก้ตารางเวร</div>
+    <div style="padding:16px 20px;" id="admin-pin-settings"></div>
   </div>
 
   <!-- MANAGE RESIDENTS -->
@@ -952,6 +965,23 @@ th.col-N{min-width:185px;background:#3b0764;border-left:3px solid #8b5cf6;}
     <div class="modal-actions">
       <button class="btn btn-outline" onclick="closeWeightModal()">ยกเลิก</button>
       <button class="btn btn-amber" onclick="confirmWeightSchedule()">🔄 จัดตาราง</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADMIN LOGIN MODAL -->
+<div class="overlay" id="admin-modal">
+  <div class="modal" style="width:320px;max-width:95vw">
+    <h3>👑 Admin Login</h3>
+    <div class="modal-sub">ใส่รหัส Admin เพื่อแก้ไขตารางเวร</div>
+    <div class="form-group">
+      <label class="form-label">รหัส Admin</label>
+      <input type="password" class="form-ctrl" id="admin-pin-input" placeholder="รหัส..." onkeydown="if(event.key==='Enter')confirmAdminLogin()">
+    </div>
+    <div id="admin-login-err" style="display:none;font-size:12px;color:#dc2626;margin-bottom:8px;">❌ รหัสไม่ถูกต้อง</div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="document.getElementById('admin-modal').classList.remove('open')">ยกเลิก</button>
+      <button class="btn btn-red" onclick="confirmAdminLogin()">👑 เข้าสู่ระบบ</button>
     </div>
   </div>
 </div>
@@ -1260,6 +1290,7 @@ function createRotate(startStr, endStr=null, customLabel=null) {
     confDays: [], // [{date:'YYYY-MM-DD', type:'IH'|'Tox'|'EMS'}]
     outsiders: [], // [{id, name, quota, active}]
     outsideFlags: {}, // {d: {shift: [rid, ...]}} — toggle วนนอกแผนก
+    dayoffLocked: false, // admin ล็อกรับ dayoff
     lvs: [],
     holidays: [],
     locked: false, // 🔒 lock หลังจัดเสร็จ
@@ -1282,6 +1313,8 @@ function nextRotateStart(ri) {
 let _fbSaveTimer = null;
 let _fbListenTimer = null;
 let _pendingCloudData = null;
+let _globalAdminPin = localStorage.getItem('er28_adminPin') || '';
+let _isAdminSession = false;
 function saveState() {
   try {
     // Save rotates with full info: startStr + endStr + customLabel
@@ -1298,7 +1331,8 @@ function saveState() {
       if (window._fbReady && window._fbSave) {
         const ok = await window._fbSave(
           rotatesMeta,
-          JSON.parse(JSON.stringify(perRot))
+          JSON.parse(JSON.stringify(perRot)),
+          _globalAdminPin
         );
         setSaveInd(ok);
         if (!ok) showToast('⚠ Cloud save ล้มเหลว (บันทึกเฉพาะ local)','err');
@@ -1332,6 +1366,7 @@ function loadState() {
         specialBlocks: pr.specialBlocks ?? [],
         outsiders: pr.outsiders ?? [],
         outsideFlags: pr.outsideFlags ?? {},
+        dayoffLocked: pr.dayoffLocked ?? false,
         locked: pr.locked ?? false,
         lockPin: pr.lockPin ?? '',
         active: pr.active ?? {},
@@ -1376,6 +1411,10 @@ function applyCloudData(data) {
     localStorage.setItem('er28_rotates', JSON.stringify(data.rotates));
     localStorage.setItem('er28_perRot', JSON.stringify(data.perRot));
     localStorage.setItem('er28_ts', String(data.updatedAt||Date.now()));
+    if (data.adminPin !== undefined && data.adminPin !== _globalAdminPin) {
+      _globalAdminPin = data.adminPin || '';
+      localStorage.setItem('er28_adminPin', _globalAdminPin);
+    }
     loadState();
     renderRotateChips('rotate-chips', RI, 'selectRotate');
     renderTable();
@@ -1741,9 +1780,159 @@ function updateLockUI() {
     const el = document.getElementById(id);
     if (el) el.style.opacity = locked ? '0.3' : '';
   });
+  renderDayoffLockUI();
+  updateAdminUI();
+}
+
+// ── Admin mode helpers ────────────────────────────────────────
+function isAdminMode() { return !_globalAdminPin || _isAdminSession; }
+
+function guardAdmin() {
+  if (isAdminMode()) return false;
+  showToast('🔒 ต้องล็อกอิน Admin ก่อนแก้ไขตาราง', 'err');
+  document.getElementById('admin-pin-input').value = '';
+  document.getElementById('admin-login-err').style.display = 'none';
+  document.getElementById('admin-modal').classList.add('open');
+  return true;
+}
+
+function guardDayoffLocked() {
+  if (perRot[RI]?.dayoffLocked) {
+    showToast('🔒 Admin ปิดรับ Day off แล้ว', 'err');
+    return true;
+  }
+  return false;
+}
+
+function confirmAdminLogin() {
+  const pin = document.getElementById('admin-pin-input').value;
+  const errEl = document.getElementById('admin-login-err');
+  if (_globalAdminPin && btoa(pin) !== _globalAdminPin) {
+    errEl.style.display = '';
+    return;
+  }
+  errEl.style.display = 'none';
+  _isAdminSession = true;
+  document.getElementById('admin-modal').classList.remove('open');
+  updateAdminUI();
+  showToast('👑 เข้าสู่ Admin mode แล้ว', 'ok');
+}
+
+function exitAdminSession() {
+  _isAdminSession = false;
+  updateAdminUI();
+  showToast('👋 ออกจาก Admin mode แล้ว', 'ok');
+}
+
+function updateAdminUI() {
+  const btn = document.getElementById('admin-nav-btn');
+  if (btn) {
+    if (!_globalAdminPin) {
+      btn.style.display = 'none';
+    } else {
+      btn.style.display = '';
+      if (_isAdminSession) {
+        btn.textContent = '👑 Admin';
+        btn.style.cssText='background:#ef4444;color:#fff;border-radius:6px;border:none;padding:5px 12px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;';
+        btn.onclick = exitAdminSession;
+      } else {
+        btn.textContent = '🔒 Admin';
+        btn.style.cssText='background:transparent;color:#94a3b8;border-radius:6px;border:1px solid #475569;padding:5px 12px;font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;';
+        btn.onclick = () => {
+          document.getElementById('admin-pin-input').value = '';
+          document.getElementById('admin-login-err').style.display = 'none';
+          document.getElementById('admin-modal').classList.add('open');
+        };
+      }
+    }
+  }
+  // dayoff lock button — show only to admin
+  const dlBtn = document.getElementById('dayoff-lock-btn');
+  if (dlBtn) dlBtn.style.display = isAdminMode() ? '' : 'none';
+  // re-render settings PIN card if open
+  if (document.getElementById('tab-settings')?.classList.contains('active')) renderAdminPinSettings();
+}
+
+function toggleDayoffLock() {
+  if (!isAdminMode()) { guardAdmin(); return; }
+  const ri = RI;
+  perRot[ri].dayoffLocked = !perRot[ri].dayoffLocked;
+  saveState();
+  renderDayoffLockUI();
+  showToast(perRot[ri].dayoffLocked ? '🔒 ล็อก Day off แล้ว' : '🔓 เปิดรับ Day off แล้ว', 'ok');
+}
+
+function renderDayoffLockUI() {
+  const ri = RI;
+  const locked = perRot[ri]?.dayoffLocked;
+  const banner = document.getElementById('dayoff-lock-banner');
+  if (banner) banner.style.display = locked ? 'flex' : 'none';
+  const btn = document.getElementById('dayoff-lock-btn');
+  if (btn) {
+    btn.textContent = locked ? '🔓 เปิด Day off' : '🔒 ล็อก Day off';
+    btn.style.borderColor = locked ? '#f97316' : '';
+    btn.style.color = locked ? '#ea580c' : '';
+  }
+}
+
+function renderAdminPinSettings() {
+  const el = document.getElementById('admin-pin-settings');
+  if (!el) return;
+  if (_globalAdminPin) {
+    el.innerHTML = `
+      <div style="font-size:12px;color:#16a34a;margin-bottom:12px;">✅ มีรหัส Admin ตั้งแล้ว${_isAdminSession ? ' · <b>กำลัง Admin mode อยู่</b>' : ' · ยังไม่ได้ล็อกอิน'}</div>
+      ${isAdminMode() ? `
+      <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">เมื่อมีรหัส Admin — เฉพาะ Admin เท่านั้นที่แก้ตารางเวรได้ ทุกคนยังเพิ่ม Day off ได้ตามปกติ</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-outline btn-sm" onclick="showChangeAdminPin()">🔑 เปลี่ยนรหัส</button>
+        <button class="btn btn-outline btn-sm" style="color:#dc2626;border-color:#fca5a5" onclick="removeAdminPin()">🗑 ลบรหัส Admin</button>
+      </div>
+      <div id="change-admin-pin-form" style="display:none;margin-top:14px;">
+        <div class="form-group"><label class="form-label">รหัสใหม่</label><input type="password" class="form-ctrl" id="new-admin-pin" placeholder="รหัสใหม่"></div>
+        <div class="form-group"><label class="form-label">ยืนยันรหัส</label><input type="password" class="form-ctrl" id="confirm-admin-pin" placeholder="ยืนยัน"></div>
+        <button class="btn btn-red btn-sm" onclick="saveAdminPin()">💾 บันทึกรหัสใหม่</button>
+      </div>` : `<div style="font-size:12px;color:var(--muted);">กด 🔒 Admin (มุมบนขวา) เพื่อล็อกอินก่อน</div>`}
+    `;
+  } else {
+    el.innerHTML = `
+      <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">ยังไม่มีรหัส Admin — ทุกคนแก้ตารางได้ ตั้งรหัสเพื่อจำกัดสิทธิ์</div>
+      <div class="form-group"><label class="form-label">รหัส Admin ใหม่</label><input type="password" class="form-ctrl" id="new-admin-pin" placeholder="ตั้งรหัส..."></div>
+      <div class="form-group"><label class="form-label">ยืนยันรหัส</label><input type="password" class="form-ctrl" id="confirm-admin-pin" placeholder="ยืนยัน..."></div>
+      <button class="btn btn-red" onclick="saveAdminPin()">👑 ตั้งรหัส Admin</button>
+    `;
+  }
+}
+
+function showChangeAdminPin() {
+  const f = document.getElementById('change-admin-pin-form');
+  if (f) f.style.display = f.style.display === 'none' ? '' : 'none';
+}
+
+function saveAdminPin() {
+  const pin = document.getElementById('new-admin-pin')?.value.trim();
+  const confirm = document.getElementById('confirm-admin-pin')?.value.trim();
+  if (!pin) { showToast('⚠ กรุณาใส่รหัส', 'err'); return; }
+  if (pin !== confirm) { showToast('⚠ รหัสไม่ตรงกัน', 'err'); return; }
+  _globalAdminPin = btoa(pin);
+  _isAdminSession = true;
+  localStorage.setItem('er28_adminPin', _globalAdminPin);
+  saveState();
+  updateAdminUI();
+  showToast('✅ ตั้งรหัส Admin แล้ว — Admin mode เปิดอยู่', 'ok');
+}
+
+function removeAdminPin() {
+  if (!confirm('ลบรหัส Admin ออก? ทุกคนจะแก้ตารางได้')) return;
+  _globalAdminPin = '';
+  _isAdminSession = false;
+  localStorage.setItem('er28_adminPin', '');
+  saveState();
+  updateAdminUI();
+  showToast('✅ ลบรหัส Admin แล้ว', 'ok');
 }
 
 function guardLocked() {
+  if (guardAdmin()) return true;
   if (isLocked(RI)) {
     showToast('🔒 Rotate นี้ถูกล็อก — ปลดล็อกก่อนแก้ไข', 'warn');
     return true;
@@ -3160,7 +3349,8 @@ function updateLvShiftLabel() {
 }
 
 function addLeave(){
-  if (guardLocked()) return;
+  if (isLocked(RI)) { showToast('🔒 Rotate ถูกล็อก','warn'); return; }
+  if (guardDayoffLocked()) return;
   const ri=RI, rot=rotates[ri];
   const rid=document.getElementById('lv-res').value;
   const date=document.getElementById('lv-date').value;
@@ -3188,7 +3378,8 @@ function addLeave(){
 }
 
 function adminRemoveLv(idx){
-  if (guardLocked()) return;
+  if (isLocked(RI)) { showToast('🔒 Rotate ถูกล็อก','warn'); return; }
+  if (guardDayoffLocked()) return;
   perRot[RI].lvs.splice(idx,1);
   saveState(); renderLeaveList(); renderTable();
 }
@@ -3411,9 +3602,9 @@ function switchTab(tab,btn){
   document.getElementById('tab-'+tab).classList.add('active');
   if(btn) btn.classList.add('active');
   if(tab==='residents') renderResGrid();
-  if(tab==='leaves'){ renderLeaveSelect(); renderLeaveList(); }
+  if(tab==='leaves'){ renderLeaveSelect(); renderLeaveList(); renderDayoffLockUI(); updateAdminUI(); }
   if(tab==='fairness') renderFairness();
-  if(tab==='settings'){ renderResManageGrid(); renderConfDays(); renderICalButtons(); }
+  if(tab==='settings'){ renderResManageGrid(); renderConfDays(); renderICalButtons(); renderAdminPinSettings(); }
 }
 function renderAll(){
   renderRotateChips('rotate-chips',RI,'selectRotate');
@@ -4072,6 +4263,8 @@ function renderEmptyState() {
     showToast('👋 กด "+ Add Rotate" เพื่อสร้างรอบแรก', 'ok');
   }
   updateUndoRedoBtns();
+  updateAdminUI();
+  updateLockUI();
   checkOnboarding();
 
   // โหลดจาก Firestore (Firebase module อาจโหลดทีหลัง → ฟัง event)
