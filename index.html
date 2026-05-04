@@ -1688,6 +1688,7 @@ function renderICalButtons() {
 function isLocked(ri) { return perRot[ri]?.locked === true; }
 
 function toggleLock() {
+  if (guardAdmin()) return;
   const ri = RI;
   if (!rotates.length || !perRot[ri]) { showToast('⚠ ยังไม่มี Rotate','err'); return; }
   if (isLocked(ri)) {
@@ -2953,6 +2954,7 @@ function updateRotPreview(){
 function closeAddRotate(){ document.getElementById('add-rot-overlay').classList.remove('open'); }
 
 function confirmRotModal(){
+  if (guardAdmin()) return;
   const startVal=document.getElementById('new-rot-start').value;
   const endVal=document.getElementById('new-rot-end').value;
   const nameVal=document.getElementById('new-rot-name').value.trim()||null;
@@ -2989,6 +2991,7 @@ function confirmRotModal(){
 }
 
 function deleteRotate(ri){
+  if (guardAdmin()) return;
   if(rotates.length<=1){ showToast('⚠ ต้องมีอย่างน้อย 1 Rotate','err'); return; }
   if(!confirm(`ลบ "${rotates[ri].label}" ?
 ข้อมูลตารางและคำขอลาใน Rotate นี้จะหายทั้งหมด`)) return;
@@ -3127,6 +3130,7 @@ function toggleOutsideFlag(rid, d, shift) {
 }
 
 function toggleOutsider(i) {
+  if (guardAdmin()) return;
   const ri=RI;
   if(!perRot[ri].outsiders) perRot[ri].outsiders=[];
   perRot[ri].outsiders[i].active = !perRot[ri].outsiders[i].active;
@@ -3134,6 +3138,7 @@ function toggleOutsider(i) {
 }
 
 function setOutsiderQuota(i, val) {
+  if (guardAdmin()) return;
   const ri=RI;
   if(!perRot[ri].outsiders) perRot[ri].outsiders=[];
   perRot[ri].outsiders[i].quota = +val;
@@ -3141,6 +3146,7 @@ function setOutsiderQuota(i, val) {
 }
 
 function removeOutsider(i) {
+  if (guardAdmin()) return;
   const ri=RI;
   const o = perRot[ri].outsiders[i];
   if(!confirm(`ลบ "${o.name}" ออก?`)) return;
@@ -3164,6 +3170,7 @@ function closeOutsiderModal() {
   document.getElementById('outsider-modal').classList.remove('open');
 }
 function confirmAddOutsider() {
+  if (guardAdmin()) return;
   const ri=RI;
   const name = document.getElementById('outsider-name-input').value.trim();
   const quota = +document.getElementById('outsider-quota-input').value;
@@ -3176,6 +3183,7 @@ function confirmAddOutsider() {
 }
 // Cycle double shift preference: undefined → true (ชอบ) → false (ไม่ชอบ) → undefined
 function cycleDoubleShiftPref(id) {
+  if (guardAdmin()) return;
   const r = RES.find(x=>x.id===id); if(!r) return;
   if (r.prefersDouble === undefined || r.prefersDouble === null) r.prefersDouble = true;
   else if (r.prefersDouble === true) r.prefersDouble = false;
@@ -3210,6 +3218,7 @@ function toggleOutsiderAssign(oid, d, ri, shift='A') {
 }
 
 function toggleRes(id){
+  if (guardAdmin()) return;
   const ri=RI;
   const current = perRot[ri].active[id];
   perRot[ri].active[id] = (current === false) ? true : false;
@@ -3850,6 +3859,7 @@ function addConfDayInline(){
 }
 
 function addConfDay(){
+  if (guardAdmin()) return;
   const ri=RI, rot=rotates[ri];
   const date=document.getElementById('conf-date-input').value;
   const type=document.getElementById('conf-type-input').value;
@@ -3865,6 +3875,7 @@ function addConfDay(){
 }
 
 function removeConfDay(i){
+  if (guardAdmin()) return;
   perRot[RI].confDays.splice(i,1);
   saveState(); renderConfDays(); renderConfChipsInline(); renderTable();
 }
@@ -3996,6 +4007,7 @@ function updateResName(id, newName) {
 }
 
 function addResOfYear(yr) {
+  if (guardAdmin()) return;
   const resOfYr = RES.filter(r=>r.year===yr);
   if(resOfYr.length>=9){ showToast('⚠ เพิ่มได้สูงสุด 9 คนต่อชั้นปี','err'); return; }
   const palette = COLOR_PALETTES[yr];
@@ -4011,6 +4023,7 @@ function addResOfYear(yr) {
 }
 
 function deleteResident(id) {
+  if (guardAdmin()) return;
   const r = RES.find(x=>x.id===id);
   if (!r) return;
   if (!confirm(`ลบ "${r.name}" ออกจากระบบ?\nข้อมูลเวรของคนนี้จะถูกลบทั้งหมด`)) return;
@@ -4038,6 +4051,7 @@ function deleteResident(id) {
 function renderNameEditGrid() { renderResManageGrid(); } // compat alias
 
 function saveResidentNames() {
+  if (guardAdmin()) return;
   RES.forEach(r => {
     const el = document.getElementById(`ne-${r.id}`);
     if (!el) return;
@@ -4105,7 +4119,7 @@ function removeNewR1Row(i) {
 }
 
 function confirmPromotion() {
-  // Collect new R1 names
+  if (guardAdmin()) return;
   newR1Rows.forEach((row, i) => {
     const el = document.getElementById(`new-r1-${i}`);
     if (el) row.name = el.value.trim();
@@ -4157,6 +4171,7 @@ function confirmPromotion() {
 // CLEAR ALL DATA
 // ============================================================
 function clearAllData() {
+  if (guardAdmin()) return;
   if (!confirm('ยืนยันการล้างข้อมูลทั้งหมด?\nตาราง, คำขอลา, และ Rotate ทั้งหมดจะถูกลบทั้ง Local และ Cloud')) return;
   ['er28_rotates','er28_perRot','er28_hols','er28_deleted','er28_ts'].forEach(k=>localStorage.removeItem(k));
   rotates=[]; perRot=[];
