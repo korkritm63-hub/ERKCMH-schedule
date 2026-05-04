@@ -960,13 +960,13 @@ th.col-N{min-width:185px;background:#3b0764;border-left:3px solid #8b5cf6;}
 <div class="overlay" id="outsider-modal">
   <div class="modal" style="width:380px">
     <h3>🏥 เพิ่มคนนอกแผนก</h3>
-    <div class="modal-sub">ชื่อ resident ที่อยู่ rotation นอก — จะปรากฏใน modal เลือกเวรบ่ายเท่านั้น</div>
+    <div class="modal-sub">ชื่อ resident ที่อยู่ rotation นอก — จะปรากฏใน modal เลือกเวรเช้าและเวรบ่าย</div>
     <div class="form-group">
       <label class="form-label">ชื่อ</label>
       <input type="text" class="form-ctrl" id="outsider-name-input" placeholder="เช่น นพ.ภัทร Anes">
     </div>
     <div class="form-group">
-      <label class="form-label">จำนวนเวรบ่าย / Rotate</label>
+      <label class="form-label">จำนวนเวร / Rotate</label>
       <select class="form-ctrl" id="outsider-quota-input">
         <option value="2">2 เวร (2wk)</option>
         <option value="3">3 เวร</option>
@@ -974,7 +974,7 @@ th.col-N{min-width:185px;background:#3b0764;border-left:3px solid #8b5cf6;}
       </select>
     </div>
     <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px 12px;font-size:12px;color:#92400e;margin-bottom:14px;">
-      💡 คนนอกจะแสดงในช่อง <b>เวรบ่ายเท่านั้น</b> ต้องกดใส่เองใน modal แก้ไข — ระบบจะไม่ auto-จัดให้
+      💡 คนนอกจะแสดงในช่อง <b>เวรเช้าและเวรบ่าย</b> ต้องกดใส่เองใน modal แก้ไข — ระบบจะไม่ auto-จัดให้
     </div>
     <div class="modal-actions">
       <button class="btn btn-outline" onclick="closeOutsiderModal()">ยกเลิก</button>
@@ -1230,7 +1230,8 @@ function sortAssignedWithLeader(assigned, ri) {
   const r3ids = assigned.filter(id => getR(id)?.year === 3);
   const nonR3  = assigned.filter(id => { const rx=getR(id); return rx && rx.year < 3; });
   nonR3.sort((a, b) => getLeaderCount(a, ri) - getLeaderCount(b, ri));
-  return [...r3ids, ...nonR3];
+  const outsiderIds = assigned.filter(id => !getR(id)); // คนนอกแผนก (id ไม่อยู่ใน RES)
+  return [...r3ids, ...nonR3, ...outsiderIds];
 }
 // Fast O(1) resident lookup via Map — rebuild when RES changes
 let _resMap = null;
@@ -2643,13 +2644,13 @@ function renderTable(){
 
       sortedAssigned.forEach(rid=>{
         // ตรวจว่าเป็น outsider หรือ regular resident
-        const outsider = shift==='A' ? (perRot[ri].outsiders||[]).find(o=>o.id===rid) : null;
+        const outsider = (shift==='A'||shift==='M') ? (perRot[ri].outsiders||[]).find(o=>o.id===rid) : null;
         if (outsider) {
-          // Outsider chip — สีเทา แสดงชื่อเต็ม
+          // Outsider chip — สีม่วง แสดงชื่อเต็ม
           const used = countOutsiderShifts(outsider.id, ri);
           const chip = document.createElement('div');
-          chip.style.cssText=`background:#f1f5f9;color:#334155;border:1px solid #94a3b8;display:flex;align-items:center;gap:5px;padding:3px 8px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;user-select:none;`;
-          chip.innerHTML=`<span style="width:6px;height:6px;border-radius:50%;background:#64748b;flex-shrink:0;display:inline-block"></span>🏥 ${outsider.name}`;
+          chip.style.cssText=`background:#faf5ff;color:#7c3aed;border:1px solid #a855f7;display:flex;align-items:center;gap:5px;padding:3px 8px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;user-select:none;`;
+          chip.innerHTML=`<span style="width:6px;height:6px;border-radius:50%;background:#a855f7;flex-shrink:0;display:inline-block"></span>🏥 ${outsider.name}`;
           chip.title=`คนนอก: ${outsider.name} · ใช้ ${used}/${outsider.quota||4} เวร`;
           chip.onclick=()=>openModal(d,shift);
           nl.appendChild(chip);
@@ -2879,7 +2880,7 @@ function renderResGrid(){
     <div class="yr-card-hd" style="background:#f8fafc;">
       <div>
         <span style="color:#475569;font-weight:700;font-size:14px">🏥 คนนอก (นอกแผนก)</span>
-        <div style="font-size:10px;color:var(--muted);margin-top:1px">อยู่เวรบ่ายเท่านั้น · 2–4 เวร/Rotate · จัด Manual</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:1px">เวรเช้า/บ่าย · 2–4 เวร/Rotate · จัด Manual</div>
       </div>
       <span style="font-size:11px;color:var(--muted)">${outOn} คน active</span>
     </div>
@@ -2931,11 +2932,11 @@ function renderOutsiderList(ri) {
   el.innerHTML = outsiders.map((o,i)=>`
     <div class="res-row" style="background:${o.active?'#fff':'#fafafa'}">
       <div style="display:flex;align-items:center;gap:8px;flex:1;">
-        <span style="width:10px;height:10px;border-radius:3px;background:#e2e8f0;border:2px solid #64748b;display:inline-block;flex-shrink:0"></span>
+        <span style="width:10px;height:10px;border-radius:3px;background:#f3e8ff;border:2px solid #a855f7;display:inline-block;flex-shrink:0"></span>
         <div>
-          <div style="font-weight:600;font-size:13px;color:#334155">${o.name}</div>
+          <div style="font-weight:600;font-size:13px;color:#7c3aed">${o.name}</div>
           <div style="font-size:10px;color:var(--muted)">
-            🌆 บ่ายเท่านั้น · เป้า <b>${o.quota||4}</b> เวร
+            🏥 เวรเช้า/บ่าย · เป้า <b>${o.quota||4}</b> เวร
             · จัดแล้ว <b>${countOutsiderShifts(o.id,ri)}</b>
           </div>
         </div>
@@ -2955,7 +2956,10 @@ function renderOutsiderList(ri) {
 function countOutsiderShifts(oid, ri) {
   let cnt=0;
   const days=rotDays(ri);
-  for(let d=1;d<=days;d++) cnt+=(perRot[ri].sched[d]?.A||[]).filter(x=>x===oid).length;
+  for(let d=1;d<=days;d++) {
+    cnt+=(perRot[ri].sched[d]?.A||[]).filter(x=>x===oid).length;
+    cnt+=(perRot[ri].sched[d]?.M||[]).filter(x=>x===oid).length;
+  }
   return cnt;
 }
 
@@ -2981,6 +2985,7 @@ function removeOutsider(i) {
   const days=rotDays(ri);
   for(let d=1;d<=days;d++) {
     perRot[ri].sched[d].A=(perRot[ri].sched[d].A||[]).filter(x=>x!==o.id);
+    perRot[ri].sched[d].M=(perRot[ri].sched[d].M||[]).filter(x=>x!==o.id);
   }
   perRot[ri].outsiders.splice(i,1);
   saveState(); renderOutsiderList(ri); renderTable();
@@ -3004,7 +3009,7 @@ function confirmAddOutsider() {
   const id = 'out_'+Date.now();
   perRot[ri].outsiders.push({id, name, quota, active:true});
   saveState(); closeOutsiderModal(); renderResGrid();
-  showToast(`✅ เพิ่ม ${name} (${quota} เวรบ่าย) แล้ว`,'ok');
+  showToast(`✅ เพิ่ม ${name} (${quota} เวร) แล้ว`,'ok');
 }
 // Cycle double shift preference: undefined → true (ชอบ) → false (ไม่ชอบ) → undefined
 function cycleDoubleShiftPref(id) {
@@ -3025,19 +3030,20 @@ function cycleDoubleShiftPref(id) {
   showToast(`${r.name}: ${label}`,'ok');
 }
 
-function toggleOutsiderAssign(oid, d, ri) {
-  const arr = perRot[ri].sched[d].A;
+function toggleOutsiderAssign(oid, d, ri, shift='A') {
+  const arr = perRot[ri].sched[d][shift];
   const idx = arr.indexOf(oid);
   pushUndo();
+  const shiftName = shift==='M'?'เวรเช้า':shift==='A'?'เวรบ่าย':'เวรดึก';
   if (idx >= 0) {
     arr.splice(idx, 1);
-    showToast('↩ ถอดคนนอกออกจากเวรบ่าย','ok');
+    showToast(`↩ ถอดคนนอกออกจาก${shiftName}`,'ok');
   } else {
     arr.push(oid);
     const o = (perRot[ri].outsiders||[]).find(x=>x.id===oid);
-    showToast(`✅ เพิ่ม ${o?.name||'คนนอก'} เวรบ่ายวันที่ ${d}`,'ok');
+    showToast(`✅ เพิ่ม ${o?.name||'คนนอก'} ${shiftName}วันที่ ${d}`,'ok');
   }
-  saveState(); openModal(d,'A'); renderTable(); updateUndoRedoBtns();
+  saveState(); openModal(d,shift); renderTable(); updateUndoRedoBtns();
 }
 
 function toggleRes(id){
@@ -3221,8 +3227,8 @@ function openModal(d,shift){
     if(!blocked) item.onclick=()=>toggleAssign(r.id,d,shift);
     picker.appendChild(item);
   });
-  // ── Outsiders section (เวรบ่ายเท่านั้น) ─────────────────────
-  if (shift === 'A') {
+  // ── Outsiders section (เวรเช้าและเวรบ่าย) ─────────────────────
+  if (shift === 'A' || shift === 'M') {
     const outsiders = (perRot[ri].outsiders||[]).filter(o=>o.active);
     if (outsiders.length > 0) {
       const sep = document.createElement('div');
@@ -3236,21 +3242,22 @@ function openModal(d,shift){
         const overQuota = !isSel && used >= quota;
         const item = document.createElement('div');
         item.className = 'pick-item'+(isSel?' selected':'')+(overQuota?' unavail':'');
-        if(isSel) item.style.cssText='background:#f0fdf4;border:1px solid #22c55e;border-left:3px solid #22c55e';
-        else if(!overQuota) item.style.borderLeft='3px solid #64748b';
+        if(isSel) item.style.cssText='background:#faf5ff;border:1px solid #a855f7;border-left:3px solid #a855f7';
+        else if(!overQuota) item.style.borderLeft='3px solid #a855f7';
+        const shiftLabel = shift==='M' ? '☀ เวรเช้า' : '🌆 เวรบ่าย';
         const metaTxt = overQuota
           ? `⚠ ครบ ${quota} เวรแล้ว (${used}/${quota})`
-          : `🌆 บ่ายเท่านั้น · ใช้ ${used}/${quota} เวร`;
+          : `${shiftLabel} · ใช้ ${used}/${quota} เวร`;
         item.innerHTML=`
           <div style="display:flex;align-items:center;gap:8px">
-            <span style="width:10px;height:10px;border-radius:3px;background:#e2e8f0;border:2px solid #64748b;flex-shrink:0;display:inline-block"></span>
+            <span style="width:10px;height:10px;border-radius:3px;background:#f3e8ff;border:2px solid #a855f7;flex-shrink:0;display:inline-block"></span>
             <div>
-              <div class="pick-name" style="color:#334155">${o.name}</div>
+              <div class="pick-name" style="color:#7c3aed">${o.name}</div>
               <div class="pick-meta">${metaTxt}</div>
             </div>
           </div>
           ${isSel?'<span style="color:#16a34a;font-size:18px;font-weight:700">✓</span>':''}`;
-        if(!overQuota) item.onclick=()=>toggleOutsiderAssign(o.id,d,ri);
+        if(!overQuota) item.onclick=()=>toggleOutsiderAssign(o.id,d,ri,shift);
         picker.appendChild(item);
       });
     }
