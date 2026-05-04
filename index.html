@@ -1280,6 +1280,8 @@ function nextRotateStart(ri) {
 // ============================================================
 // ── Save: localStorage (instant) + Firestore (async sync) ────
 let _fbSaveTimer = null;
+let _fbListenTimer = null;
+let _pendingCloudData = null;
 function saveState() {
   try {
     // Save rotates with full info: startStr + endStr + customLabel
@@ -1361,12 +1363,20 @@ function loadState() {
 function applyCloudData(data) {
   if (!data?.rotates || !data?.perRot) return;
   try {
-    // เทียบ timestamp — ถ้า cloud ใหม่กว่า local ให้ใช้ cloud
     const localTs = parseInt(localStorage.getItem('er28_ts')||'0');
-    if (data.updatedAt && data.updatedAt <= localTs) return; // local is newer
+    if (data.updatedAt && data.updatedAt <= localTs) return;
+
+    // ถ้า modal เปิดอยู่ → เก็บ pending ไว้ก่อน อย่าพัง UX ผู้ใช้
+    if (document.getElementById('overlay')?.classList.contains('open')) {
+      _pendingCloudData = data;
+      showToast('☁️ มีข้อมูลใหม่ — จะอัปเดตหลังปิด modal','ok');
+      return;
+    }
+
     localStorage.setItem('er28_rotates', JSON.stringify(data.rotates));
     localStorage.setItem('er28_perRot', JSON.stringify(data.perRot));
-    localStorage.setItem('er28_ts', String(data.updatedAt||Date.now()));    loadState();
+    localStorage.setItem('er28_ts', String(data.updatedAt||Date.now()));
+    loadState();
     renderRotateChips('rotate-chips', RI, 'selectRotate');
     renderTable();
     setSaveInd(true);
@@ -1383,12 +1393,13 @@ async function loadFromCloud() {
     applyCloudData(data);
   }
   setSaveInd(true);
-  // Start real-time listener for collaborative editing
+  // Start real-time listener — debounce 800ms เพื่อกันกรณีหลายคน save ถี่ๆ
   if (window._fbListen) {
     window._fbListen((data) => {
       const localTs = parseInt(localStorage.getItem('er28_ts')||'0');
       if (data.updatedAt && data.updatedAt > localTs) {
-        applyCloudData(data);
+        clearTimeout(_fbListenTimer);
+        _fbListenTimer = setTimeout(() => applyCloudData(data), 800);
       }
     });
   }
@@ -3325,7 +3336,14 @@ function toggleAssign(rid,d,shift){
   }
   saveState(); openModal(d,shift); renderTable(); updateUndoRedoBtns();
 }
-function closeModal(){ document.getElementById('overlay').classList.remove('open'); }
+function closeModal(){
+  document.getElementById('overlay').classList.remove('open');
+  if (_pendingCloudData) {
+    const d = _pendingCloudData;
+    _pendingCloudData = null;
+    setTimeout(() => applyCloudData(d), 80); // รอ animation modal ปิดก่อน
+  }
+}
 document.getElementById('overlay').addEventListener('click',e=>{ if(e.target===document.getElementById('overlay')) closeModal(); });
 document.getElementById('add-rot-overlay').addEventListener('click',e=>{ if(e.target===document.getElementById('add-rot-overlay')) closeAddRotate(); });
 
