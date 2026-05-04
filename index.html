@@ -1259,6 +1259,7 @@ function createRotate(startStr, endStr=null, customLabel=null) {
     specialBlocks: [], // reserved
     confDays: [], // [{date:'YYYY-MM-DD', type:'IH'|'Tox'|'EMS'}]
     outsiders: [], // [{id, name, quota, active}]
+    outsideFlags: {}, // {d: {shift: [rid, ...]}} — toggle วนนอกแผนก
     lvs: [],
     holidays: [],
     locked: false, // 🔒 lock หลังจัดเสร็จ
@@ -1328,6 +1329,7 @@ function loadState() {
         confDays: pr.confDays ?? [],
         specialBlocks: pr.specialBlocks ?? [],
         outsiders: pr.outsiders ?? [],
+        outsideFlags: pr.outsideFlags ?? {},
         locked: pr.locked ?? false,
         lockPin: pr.lockPin ?? '',
         active: pr.active ?? {},
@@ -2657,15 +2659,22 @@ function renderTable(){
           return;
         }
         const r=getR(rid); if(!r) return;
+        const isOF = isOutsideFlagged(rid, ri, d, shift);
         const sp=softPenalty(rid,ri,d,shift);
         const icon=sp>=10?'😴':sp>=8?'😓':'';
         const isLeader = rid === leaderRid;
         const chip=document.createElement('div');
-        chip.style.cssText=`background:${r.bg};color:${r.color};border:1px solid ${isLeader?r.color:isSp?'#f59e0b':r.border};display:flex;align-items:center;gap:5px;padding:3px 8px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;transition:all .1s;user-select:none;${isLeader?`box-shadow:0 0 0 2px ${r.color}30;`:''}`;
+        if(isOF) {
+          chip.style.cssText=`background:#faf5ff;color:#7c3aed;border:1px solid #a855f7;display:flex;align-items:center;gap:5px;padding:3px 8px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;transition:all .1s;user-select:none;`;
+        } else {
+          chip.style.cssText=`background:${r.bg};color:${r.color};border:1px solid ${isLeader?r.color:isSp?'#f59e0b':r.border};display:flex;align-items:center;gap:5px;padding:3px 8px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;transition:all .1s;user-select:none;${isLeader?`box-shadow:0 0 0 2px ${r.color}30;`:''}`;
+        }
         chip.dataset.rid = rid;
         chip.dataset.name = r.name;
-        chip.innerHTML=`<span style="width:6px;height:6px;border-radius:50%;background:${isSp?'#f59e0b':r.color};flex-shrink:0;display:inline-block"></span>${icon}${isLeader?'⭐ ':''}${displayName(r)}`;
-        chip.title=`${isLeader?'👑 หัวหน้าเวร (EROU) · ':''}${r.name} ปี ${r.year} | M:${shiftCntByType(rid,ri).M} A:${shiftCntByType(rid,ri).A} N:${shiftCntByType(rid,ri).N}`;
+        chip.innerHTML = isOF
+          ? `<span style="width:6px;height:6px;border-radius:50%;background:#a855f7;flex-shrink:0;display:inline-block"></span>🏥 ${displayName(r)}`
+          : `<span style="width:6px;height:6px;border-radius:50%;background:${isSp?'#f59e0b':r.color};flex-shrink:0;display:inline-block"></span>${icon}${isLeader?'⭐ ':''}${displayName(r)}`;
+        chip.title=`${isOF?'🏥 วนนอกแผนก · ':''}${isLeader?'👑 หัวหน้าเวร (EROU) · ':''}${r.name} ปี ${r.year} | M:${shiftCntByType(rid,ri).M} A:${shiftCntByType(rid,ri).A} N:${shiftCntByType(rid,ri).N}`;
         chip.onmouseenter=()=>{chip.style.filter='brightness(0.9)';chip.style.transform='translateX(1px)';};
         chip.onmouseleave=()=>{chip.style.filter='';chip.style.transform='';};
         chip.onclick=()=>openModal(d,shift);
@@ -2963,6 +2972,20 @@ function countOutsiderShifts(oid, ri) {
   return cnt;
 }
 
+function isOutsideFlagged(rid, ri, d, shift) {
+  return (perRot[ri].outsideFlags?.[d]?.[shift] || []).includes(rid);
+}
+function toggleOutsideFlag(rid, d, shift) {
+  const ri = RI;
+  if (!perRot[ri].outsideFlags) perRot[ri].outsideFlags = {};
+  if (!perRot[ri].outsideFlags[d]) perRot[ri].outsideFlags[d] = {};
+  if (!perRot[ri].outsideFlags[d][shift]) perRot[ri].outsideFlags[d][shift] = [];
+  const arr = perRot[ri].outsideFlags[d][shift];
+  const idx = arr.indexOf(rid);
+  if (idx >= 0) arr.splice(idx, 1); else arr.push(rid);
+  saveState(); openModal(d, shift); renderTable(); updateUndoRedoBtns();
+}
+
 function toggleOutsider(i) {
   const ri=RI;
   if(!perRot[ri].outsiders) perRot[ri].outsiders=[];
@@ -3218,14 +3241,25 @@ function openModal(d,shift){
       meta=`${w?w+' ':''}M:${ct.M} A:${ct.A} N:${ct.N} | รวม:${ct.total}/${QUOTA[r.year]}`;
     }
 
+    const isOF = isOutsideFlagged(r.id, ri, d, shift);
+    if(isSel) item.style.cssText = isOF
+      ? `background:#faf5ff;border:1px solid #a855f7;border-left:3px solid #a855f7`
+      : `background:${r.bg};border:1px solid ${r.color};border-left:3px solid ${r.color}`;
     item.innerHTML=`
-      <div style="display:flex;align-items:center;gap:8px">
+      <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0">
         <span style="width:10px;height:10px;border-radius:3px;background:${r.bg};border:2px solid ${r.color};flex-shrink:0;display:inline-block"></span>
-        <div><div class="pick-name" style="color:${r.color}">${displayName(r)}</div><div class="pick-meta">${meta}</div></div>
+        <div><div class="pick-name" style="color:${isSel&&isOF?'#7c3aed':r.color}">${displayName(r)}</div><div class="pick-meta">${meta}</div></div>
       </div>
-      ${isSel?'<span style="color:#16a34a;font-size:18px;font-weight:700">✓</span>':''}`;
-    if(!blocked) item.onclick=()=>toggleAssign(r.id,d,shift);
+      <div style="display:flex;align-items:center;gap:5px;flex-shrink:0">
+        ${isSel?`<span class="outside-toggle" style="font-size:10px;padding:2px 6px;border-radius:10px;cursor:pointer;border:1px solid ${isOF?'#a855f7':'#d1d5db'};background:${isOF?'#ede9fe':'transparent'};color:${isOF?'#7c3aed':'#9ca3af'};white-space:nowrap;line-height:1.6">🏥วนนอก</span>`:''}
+        ${isSel?'<span style="color:#16a34a;font-size:18px;font-weight:700">✓</span>':''}
+      </div>`;
+    if(!blocked) item.onclick = (e) => { if(e.target.closest('.outside-toggle')) return; toggleAssign(r.id,d,shift); };
     picker.appendChild(item);
+    if(isSel) {
+      const tog = item.querySelector('.outside-toggle');
+      if(tog) tog.onclick = (e) => { e.stopPropagation(); toggleOutsideFlag(r.id, d, shift); };
+    }
   });
   // ── Outsiders section (เวรเช้าและเวรบ่าย) ─────────────────────
   if (shift === 'A' || shift === 'M') {
