@@ -3582,8 +3582,8 @@ function buildSummaryHTML(ri) {
 
   // ─── Main table — full width landscape ────────────────────
   // คำนวณ font-size ตามจำนวนวัน
-  const rowFs = days > 28 ? '9px' : '10px';
-  const chipFs = days > 28 ? '8.5px' : '9px';
+  const rowFs = days > 28 ? '10px' : '11px';
+  const chipFs = days > 28 ? '9.5px' : '10.5px';
 
   html += `<table style="width:100%;border-collapse:collapse;font-size:${rowFs};table-layout:fixed;">
     <colgroup>
@@ -3599,9 +3599,9 @@ function buildSummaryHTML(ri) {
         <th style="background:#0f172a;color:#e2e8f0;padding:4px 2px;border:1px solid #334155;text-align:center;">#</th>
         <th style="background:#0f172a;color:#e2e8f0;padding:4px;border:1px solid #334155;">วันที่</th>
         <th style="background:#0f172a;color:#e2e8f0;padding:4px 2px;border:1px solid #334155;text-align:center;">วัน</th>
-        <th style="background:#78350f;color:#fef3c7;padding:4px 6px;border:1px solid #92400e;text-align:center;font-size:10px;">☀ เช้า 08–16</th>
-        <th style="background:#1e3a8a;color:#dbeafe;padding:4px 6px;border:1px solid #1d4ed8;text-align:center;font-size:10px;">🌆 บ่าย 16–24</th>
-        <th style="background:#3b0764;color:#ede9fe;padding:4px 6px;border:1px solid #581c87;text-align:center;font-size:10px;">🌙 ดึก 00–08</th>
+        <th style="background:#78350f;color:#fef3c7;padding:4px 6px;border:1px solid #92400e;text-align:center;font-size:11px;">☀ เช้า 08–16</th>
+        <th style="background:#1e3a8a;color:#dbeafe;padding:4px 6px;border:1px solid #1d4ed8;text-align:center;font-size:11px;">🌆 บ่าย 16–24</th>
+        <th style="background:#3b0764;color:#ede9fe;padding:4px 6px;border:1px solid #581c87;text-align:center;font-size:11px;">🌙 ดึก 00–08</th>
       </tr>
     </thead>
     <tbody>`;
@@ -3652,39 +3652,6 @@ function buildSummaryHTML(ri) {
     </tr>`;
   }
   html += `</tbody></table>`;
-
-  // ─── Per-resident summary (compact, below table) ───────────
-  html += `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:8px;">`;
-  [3,2,1].forEach(yr => {
-    const yc={1:'#059669',2:'#2563eb',3:'#9333ea'}[yr];
-    const yb={1:'#f0fdf4',2:'#eff6ff',3:'#faf5ff'}[yr];
-    const arYr=ar.filter(r=>r.year===yr);
-    if(!arYr.length) return;
-    html+=`<div style="border:1px solid ${yc};border-radius:4px;overflow:hidden;font-size:7px;">
-      <div style="background:${yb};color:${yc};padding:3px 6px;font-weight:700;font-size:7.5px;border-bottom:1px solid ${yc};">ปี ${yr} · เป้า ${QUOTA[yr]} เวร</div>
-      <table style="width:100%;border-collapse:collapse;">
-        <thead><tr style="background:#f8fafc;">
-          <th style="padding:2px 4px;border-bottom:1px solid #e2e8f0;text-align:left;font-size:6.5px;">ชื่อ</th>
-          <th style="padding:2px;border-bottom:1px solid #e2e8f0;text-align:center;color:#b45309;font-size:6.5px;">M</th>
-          <th style="padding:2px;border-bottom:1px solid #e2e8f0;text-align:center;color:#1d4ed8;font-size:6.5px;">A</th>
-          <th style="padding:2px;border-bottom:1px solid #e2e8f0;text-align:center;color:#7c3aed;font-size:6.5px;">N</th>
-          <th style="padding:2px;border-bottom:1px solid #e2e8f0;text-align:center;font-weight:700;font-size:6.5px;">รวม</th>
-        </tr></thead><tbody>`;
-    arYr.forEach(r=>{
-      const ct=shiftCntByType(r.id,ri);
-      const tc=ct.total===QUOTA[yr]?'#16a34a':ct.total>QUOTA[yr]?'#dc2626':'#d97706';
-      const lc=getLeaderCount(r.id,ri);
-      html+=`<tr>
-        <td style="padding:2px 4px;border-bottom:1px solid #f8fafc;color:${r.color};font-weight:700;">${r.name}${lc>0?`<span style="color:#92400e;font-size:5.5px;margin-left:2px;">⭐${lc}</span>`:''}</td>
-        <td style="padding:2px;border-bottom:1px solid #f8fafc;text-align:center;font-family:monospace;">${ct.M}</td>
-        <td style="padding:2px;border-bottom:1px solid #f8fafc;text-align:center;font-family:monospace;">${ct.A}</td>
-        <td style="padding:2px;border-bottom:1px solid #f8fafc;text-align:center;font-family:monospace;">${ct.N}</td>
-        <td style="padding:2px;border-bottom:1px solid #f8fafc;text-align:center;font-weight:700;color:${tc};font-family:monospace;">${ct.total}</td>
-      </tr>`;
-    });
-    html+=`</tbody></table></div>`;
-  });
-  html+=`</div>`;
 
   // ─── Footer ───────────────────────────────────────────────
   html+=`<div style="margin-top:6px;font-size:7px;color:#94a3b8;text-align:right;border-top:1px solid #e2e8f0;padding-top:4px;">
