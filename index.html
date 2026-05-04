@@ -1230,7 +1230,8 @@ function sortAssignedWithLeader(assigned, ri) {
   const r3ids = assigned.filter(id => getR(id)?.year === 3);
   const nonR3  = assigned.filter(id => { const rx=getR(id); return rx && rx.year < 3; });
   nonR3.sort((a, b) => getLeaderCount(a, ri) - getLeaderCount(b, ri));
-  return [...r3ids, ...nonR3];
+  const outsiderIds = assigned.filter(id => !getR(id)); // คนนอกแผนก (id ไม่อยู่ใน RES)
+  return [...r3ids, ...nonR3, ...outsiderIds];
 }
 // Fast O(1) resident lookup via Map — rebuild when RES changes
 let _resMap = null;
