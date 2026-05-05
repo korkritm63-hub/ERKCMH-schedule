@@ -4307,8 +4307,8 @@ function buildSummaryHTML(ri) {
   // header ~34px, tableHeader ~20px, footer ~13px, padding 10×2=20
   const availH = 794 - 20 - 34 - 20 - 13;
   const rowH = Math.floor(availH / days);
-  const rowFs = Math.min(13, Math.max(9, Math.round(rowH * 0.52))) + 'px';
-  const chipFs = Math.min(12, Math.max(8, Math.round(rowH * 0.47))) + 'px';
+  const rowFs = Math.min(14, Math.max(9, Math.round(rowH * 0.58))) + 'px';
+  const chipFs = Math.min(13, Math.max(8, Math.round(rowH * 0.54))) + 'px';
 
   html += `<table style="width:100%;border-collapse:collapse;font-size:${rowFs};table-layout:fixed;">
     <colgroup>
@@ -4355,11 +4355,11 @@ function buildSummaryHTML(ri) {
         // old outsider system (out_xxx id)
         const outsider = (perRot[ri].outsiders||[]).find(o=>o.id===id);
         if (outsider) {
-          return `<span style="display:inline-block;padding:1px 4px;margin:1px 0;border-radius:2px;background:#faf5ff;color:#7c3aed;border:1px solid #a855f7;font-size:${chipFs};font-weight:600;white-space:nowrap;">🏥 ${outsider.name}</span>`;
+          return `<span style="display:inline-block;padding:1px 4px;margin:1px 0;border-radius:2px;background:#faf5ff;color:#7c3aed;border:1px solid #a855f7;font-size:${chipFs};font-weight:700;white-space:nowrap;">🏥 ${outsider.name}</span>`;
         }
         const r=getR(id); if(!r) return '';
         const isL=id===leaderRid;
-        return `<span style="display:inline-block;padding:1px 4px;margin:1px 0;border-radius:2px;background:${r.bg};color:${r.color};border:1px solid ${isL?r.color:r.border};font-size:${chipFs};font-weight:600;white-space:nowrap;${isL?`box-shadow:0 0 0 1px ${r.color}50;`:''}">${isL?'⭐':''}R${r.year} ${r.name}</span>`;
+        return `<span style="display:inline-block;padding:1px 4px;margin:1px 0;border-radius:2px;background:${r.bg};color:${r.color};border:1px solid ${isL?r.color:r.border};font-size:${chipFs};font-weight:700;white-space:nowrap;${isL?`box-shadow:0 0 0 1px ${r.color}50;`:''}">${isL?'⭐':''}<sup style="font-size:.7em;opacity:.7;">${r.year}</sup>${r.name}</span>`;
       }).join(' ');
     };
 
