@@ -3771,6 +3771,7 @@ function renderResGrid(){
           <div>
             <div style="font-weight:600;font-size:13px;color:${r.color}">${displayName(r)}</div>
             <div style="font-size:11px;color:var(--muted)">M:${c.M} A:${c.A} N:${c.N} · รวม:${c.total}/${QUOTA[r.year]}</div>
+            ${r.pin?`<div style="font-size:10px;margin-top:2px;"><span style="background:#f1f5f9;border:1px solid #e2e8f0;border-radius:4px;padding:1px 6px;color:#64748b;font-family:'IBM Plex Mono',monospace;letter-spacing:.5px;">PIN ${r.pin}</span></div>`:''}
           </div>
         </div>
         <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
