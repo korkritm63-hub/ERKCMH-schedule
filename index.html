@@ -527,6 +527,7 @@ th.col-N{min-width:185px;background:#3b0764;border-left:3px solid #8b5cf6;}
       <button class="nav-btn active" onclick="switchTab('schedule',this)">📅 ตาราง</button>
       <button class="nav-btn" onclick="switchTab('residents',this)">👨‍⚕️ Residents</button>
       <button class="nav-btn" onclick="switchTab('leaves',this)">📋 Dayoff</button>
+      <button class="nav-btn" onclick="switchTab('swap',this)">🔄 Swap</button>
       <button class="nav-btn" onclick="switchTab('fairness',this)">📊 Fairness</button>
       <button class="nav-btn" onclick="switchTab('settings',this)">⚙️ ตั้งค่า</button>
     </div>
@@ -793,6 +794,10 @@ th.col-N{min-width:185px;background:#3b0764;border-left:3px solid #8b5cf6;}
   </div>
 </div>
 
+<div id="tab-swap" class="tab-content">
+  <div style="padding:24px 0;" id="swap-tab-body"></div>
+</div>
+
 </div><!-- /container -->
 <div class="overlay" id="overlay">
   <div class="modal">
@@ -837,6 +842,24 @@ th.col-N{min-width:185px;background:#3b0764;border-left:3px solid #8b5cf6;}
     <div id="pv-stats" style="margin:16px 0;"></div>
     <div id="pv-swap-pending"></div>
     <div id="pv-shifts"></div>
+  </div>
+  <!-- Swap Form -->
+  <div id="pv-swap-form" style="display:none;max-width:560px;margin:0 auto;padding:20px 16px;width:100%;">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+      <button onclick="pvSwapFormBack()" style="background:none;border:none;color:#94a3b8;font-size:22px;cursor:pointer;padding:0;line-height:1;">←</button>
+      <div style="font-size:17px;font-weight:800;">🔄 ขอสลับเวร</div>
+    </div>
+    <div id="pv-sf-my-shift" style="background:#1e293b;border:1px solid #334155;border-radius:12px;padding:14px;margin-bottom:16px;"></div>
+    <div style="font-size:13px;font-weight:700;color:#94a3b8;margin-bottom:8px;">สลับกับ Resident:</div>
+    <select id="pv-sf-target" onchange="pvSelectTarget(this.value)"
+      style="width:100%;padding:10px 14px;border:1px solid #334155;border-radius:10px;background:#1e293b;color:#e2e8f0;font-size:14px;font-family:'Sarabun',sans-serif;margin-bottom:16px;">
+      <option value="">— เลือก Resident —</option>
+    </select>
+    <div id="pv-sf-target-shifts" style="margin-bottom:16px;"></div>
+    <div style="font-size:13px;font-weight:700;color:#94a3b8;margin-bottom:6px;">โน้ต (ไม่บังคับ):</div>
+    <textarea id="pv-sf-note" rows="2" placeholder="เหตุผลหรือข้อความถึงผู้รับและ admin..."
+      style="width:100%;padding:10px 14px;border:1px solid #334155;border-radius:10px;background:#1e293b;color:#e2e8f0;font-size:13px;font-family:'Sarabun',sans-serif;resize:none;box-sizing:border-box;margin-bottom:20px;"></textarea>
+    <button onclick="pvSubmitSwap()" style="width:100%;padding:14px;background:#1d4ed8;color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:'Sarabun',sans-serif;">📨 ส่งคำขอสลับเวร</button>
   </div>
 </div>
 
@@ -1346,7 +1369,8 @@ function createRotate(startStr, endStr=null, customLabel=null) {
     active: Object.fromEntries(RES.map(r=>[r.id, true])),
     sched: Object.fromEntries(Array.from({length:rot.days},(_,i)=>[i+1,{M:[],A:[],N:[]}])),
     confDays: [], // [{date:'YYYY-MM-DD', type:'IH'|'Tox'|'EMS'}]
-    swapRequests: [], // [{id, fromRid, toRid, ri, day, shift, note, status, createdAt}]
+    swapRequests: [], // [{id, fromRid, toRid, fromDay, fromShift, toDay, toShift, note, status, createdAt}]
+    changeLog: [],    // [{ts, action, desc}]
     outsiders: [], // [{id, name, quota, active}]
     outsideFlags: {}, // {d: {shift: [rid, ...]}} — toggle วนนอกแผนก
     dayoffLocked: false, // admin ล็อกรับ dayoff
@@ -1431,6 +1455,7 @@ function loadState() {
         holidays: pr.holidays ?? [],
         confDays: pr.confDays ?? [],
         swapRequests: pr.swapRequests ?? [],
+        changeLog: pr.changeLog ?? [],
         outsiders: pr.outsiders ?? [],
         outsideFlags: pr.outsideFlags ?? {},
         dayoffLocked: pr.dayoffLocked ?? false,
@@ -1786,6 +1811,16 @@ function renderICalButtons() {
 // ============================================================
 let _pvPin = '';
 let _pvRid = null;
+let _pvSwapFromDay = null, _pvSwapFromShift = null;
+let _pvSwapToRid = null, _pvSwapToDay = null, _pvSwapToShift = null;
+let _swapTabRid = null;
+
+function logChange(ri, action, desc) {
+  if (!perRot[ri]) return;
+  if (!perRot[ri].changeLog) perRot[ri].changeLog = [];
+  perRot[ri].changeLog.unshift({ ts: Date.now(), action, desc });
+  if (perRot[ri].changeLog.length > 300) perRot[ri].changeLog.length = 300;
+}
 
 function openPersonalView() {
   _pvPin = ''; _pvRid = null;
@@ -1874,17 +1909,20 @@ function _pvRenderDashboard(rid) {
 
   // Pending swap requests
   const pending = (perRot[ri].swapRequests||[]).filter(s=>s.fromRid===rid);
+  const STATUS_LABEL = {pending_target:'⏳ รอยืนยัน',target_accepted:'⏳ รอ Admin',target_rejected:'❌ เป้าหมายปฏิเสธ',admin_approved:'✅ อนุมัติแล้ว',admin_rejected:'❌ Admin ปฏิเสธ'};
   const pendHtml = pending.length ? `
     <div style="margin-bottom:16px;">
       <div style="font-size:12px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">คำขอสลับเวรของฉัน</div>
       ${pending.map(sw=>{
-        const dt = rotDay(ri,sw.day);
+        const dt = rotDay(ri,sw.fromDay||sw.day);
+        const toR = getR(sw.toRid);
         return `<div style="background:#1e293b;border:1px solid #334155;border-radius:10px;padding:10px 12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
           <div>
-            <div style="font-size:13px;font-weight:700;">${{M:'☀ เช้า',A:'🌆 บ่าย',N:'🌙 ดึก'}[sw.shift]} — ${dt.getDate()} ${TH_MONTHS[dt.getMonth()+1]}</div>
+            <div style="font-size:13px;font-weight:700;">${{M:'☀ เช้า',A:'🌆 บ่าย',N:'🌙 ดึก'}[sw.fromShift||sw.shift]} — ${dt.getDate()} ${TH_MONTHS[dt.getMonth()+1]}</div>
+            ${toR?`<div style="font-size:11px;color:#94a3b8;margin-top:2px;">กับ ${toR.name}</div>`:''}
             ${sw.note?`<div style="font-size:11px;color:#64748b;margin-top:2px;">"${sw.note}"</div>`:''}
           </div>
-          <span class="swap-tag ${sw.status}">${{pending:'⏳ รอ admin',approved:'✅ อนุมัติ',rejected:'❌ ปฏิเสธ'}[sw.status]}</span>
+          <span class="swap-tag">${STATUS_LABEL[sw.status]||sw.status}</span>
         </div>`;
       }).join('')}
     </div>` : '';
@@ -1926,7 +1964,7 @@ function _pvRenderDashboard(rid) {
     const isErou  = eroMap[`${x.d}:${x.s}`]===rid;
     const others  = (perRot[ri].sched[x.d]?.[x.s]||[]).filter(id=>id!==rid)
                     .map(id=>{ const rx=getR(id); return rx?rx.name:(perRot[ri].outsiders||[]).find(o=>o.id===id)?.name||id; });
-    const hasPending = (perRot[ri].swapRequests||[]).some(sw=>sw.fromRid===rid&&sw.day===x.d&&sw.shift===x.s&&sw.status==='pending');
+    const hasPending = (perRot[ri].swapRequests||[]).some(sw=>sw.fromRid===rid&&sw.fromDay===x.d&&sw.fromShift===x.s&&['pending_target','target_accepted'].includes(sw.status));
     const DOW_TH2=['อา','จ','อ','พ','พฤ','ศ','ส'];
     return `<div class="pv-shift-card${isErou?' erou':''}${isToday?' today':''}">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;">
@@ -1953,46 +1991,347 @@ function _pvRenderDashboard(rid) {
 function pvOpenSwapForm(day, shift) {
   const rid = _pvRid; if (!rid) return;
   const ri = RI;
+  _pvSwapFromDay = day; _pvSwapFromShift = shift;
+  _pvSwapToRid = null; _pvSwapToDay = null; _pvSwapToShift = null;
   const dt = rotDay(ri, day);
-  const shiftName = {M:'☀ เวรเช้า',A:'🌆 เวรบ่าย',N:'🌙 เวรดึก'}[shift];
-  const note = prompt(`ขอสลับเวร: ${shiftName} วันที่ ${dt.getDate()} ${TH_MONTHS[dt.getMonth()+1]}\n\nใส่โน้ตถึง admin (ไม่บังคับ):`);
-  if (note === null) return; // cancelled
+  const DOW = ['อา','จ','อ','พ','พฤ','ศ','ส'];
+  const sName = {M:'☀ เวรเช้า',A:'🌆 เวรบ่าย',N:'🌙 เวรดึก'}[shift];
+  document.getElementById('pv-sf-my-shift').innerHTML = `
+    <div style="font-size:12px;font-weight:700;color:#94a3b8;margin-bottom:6px;">เวรที่ต้องการสลับ:</div>
+    <div style="font-size:15px;font-weight:800;color:#f1f5f9;">${sName}</div>
+    <div style="font-size:12px;color:#94a3b8;margin-top:2px;">${DOW[dt.getDay()]} ${dt.getDate()} ${TH_MONTHS[dt.getMonth()+1]}</div>`;
+  const ar = activeRes(ri).filter(r => r.id !== rid);
+  const sel = document.getElementById('pv-sf-target');
+  sel.innerHTML = '<option value="">— เลือก Resident —</option>' +
+    ar.map(r => `<option value="${r.id}">R${r.year} ${r.name}</option>`).join('');
+  document.getElementById('pv-sf-target-shifts').innerHTML = '';
+  document.getElementById('pv-sf-note').value = '';
+  document.getElementById('pv-dashboard').style.display = 'none';
+  document.getElementById('pv-swap-form').style.display = 'block';
+}
+
+function pvSwapFormBack() {
+  document.getElementById('pv-swap-form').style.display = 'none';
+  document.getElementById('pv-dashboard').style.display = 'block';
+}
+
+function pvSelectTarget(toRid) {
+  _pvSwapToRid = toRid || null;
+  _pvSwapToDay = null; _pvSwapToShift = null;
+  const container = document.getElementById('pv-sf-target-shifts');
+  if (!toRid) { container.innerHTML = ''; return; }
+  const ri = RI;
+  const days = rotDays(ri);
+  const DOW = ['อา','จ','อ','พ','พฤ','ศ','ส'];
+  const targetShifts = [];
+  for (let d=1; d<=days; d++) {
+    for (const s of SHIFTS) {
+      if ((perRot[ri].sched[d]?.[s]||[]).includes(toRid)) {
+        const dt = rotDay(ri, d);
+        targetShifts.push({d, s, dt});
+      }
+    }
+  }
+  targetShifts.sort((a,b) => a.dt - b.dt);
+  if (!targetShifts.length) {
+    container.innerHTML = '<div style="color:#64748b;font-size:13px;padding:8px 0;">ไม่มีเวรใน Rotate นี้</div>';
+    return;
+  }
+  const sCol = {M:'#b45309',A:'#1d4ed8',N:'#7c3aed'};
+  const sNm  = {M:'☀ เช้า',A:'🌆 บ่าย',N:'🌙 ดึก'};
+  container.innerHTML = `
+    <div style="font-size:13px;font-weight:700;color:#94a3b8;margin-bottom:8px;">เลือกเวรที่ต้องการสลับด้วย:</div>
+    ${targetShifts.map(x=>`
+      <div onclick="pvPickTargetShift(${x.d},'${x.s}',this)"
+           style="background:#1e293b;border:1px solid #334155;border-radius:10px;padding:10px 14px;margin-bottom:8px;cursor:pointer;"
+           data-d="${x.d}" data-s="${x.s}">
+        <div style="font-size:14px;font-weight:700;color:${sCol[x.s]};">${sNm[x.s]}</div>
+        <div style="font-size:12px;color:#94a3b8;margin-top:2px;">${DOW[x.dt.getDay()]} ${x.dt.getDate()} ${TH_MONTHS[x.dt.getMonth()+1]}</div>
+      </div>`).join('')}`;
+}
+
+function pvPickTargetShift(day, shift, el) {
+  _pvSwapToDay = day; _pvSwapToShift = shift;
+  document.querySelectorAll('#pv-sf-target-shifts [data-d]').forEach(e => {
+    e.style.borderColor = '#334155'; e.style.background = '#1e293b';
+  });
+  el.style.borderColor = '#3b82f6'; el.style.background = '#1e3a8a';
+}
+
+function pvSubmitSwap() {
+  const fromRid = _pvRid; if (!fromRid) return;
+  if (!_pvSwapToRid) { showToast('⚠ เลือก Resident ที่ต้องการสลับก่อน','warn'); return; }
+  if (!_pvSwapToDay || !_pvSwapToShift) { showToast('⚠ เลือกเวรของ Resident นั้นก่อน','warn'); return; }
+  const ri = RI;
   const req = {
     id: 'sw_'+Date.now(),
-    fromRid: rid, toRid: null,
-    ri, day, shift, note: note.trim(),
-    status: 'pending', createdAt: Date.now()
+    fromRid, toRid: _pvSwapToRid,
+    ri,
+    fromDay: _pvSwapFromDay, fromShift: _pvSwapFromShift,
+    toDay: _pvSwapToDay, toShift: _pvSwapToShift,
+    note: document.getElementById('pv-sf-note').value.trim(),
+    status: 'pending_target', createdAt: Date.now()
   };
   if (!perRot[ri].swapRequests) perRot[ri].swapRequests = [];
   perRot[ri].swapRequests.push(req);
   saveState();
+  pvSwapFormBack();
+  _pvRenderDashboard(fromRid);
+  if (document.getElementById('tab-swap')?.classList.contains('active')) renderSwapTab();
+  showToast('📨 ส่งคำขอแล้ว — รอให้อีกฝ่ายยืนยัน','ok');
+}
+
+function respondSwap(reqId, ri, accept) {
+  const req = (perRot[ri]?.swapRequests||[]).find(s=>s.id===reqId); if (!req) return;
+  req.status = accept ? 'target_accepted' : 'target_rejected';
+  const fromR=getR(req.fromRid), toR=getR(req.toRid);
+  const sNmS={M:'เช้า',A:'บ่าย',N:'ดึก'};
+  logChange(ri, accept?'swap_target_accept':'swap_target_reject',
+    `${toR?.name||req.toRid} ${accept?'ยอมรับ':'ปฏิเสธ'}การขอสลับจาก ${fromR?.name||req.fromRid} (เวร${sNmS[req.fromShift]})`);
+  saveState();
+  renderSwapTab();
   renderSwapAdminPanel();
-  _pvRenderDashboard(rid); // refresh dashboard
-  showToast('📨 ส่งคำขอสลับเวรแล้ว — admin จะได้รับแจ้ง','ok');
+  showToast(accept ? '✅ ยอมรับแล้ว — รอ Admin อนุมัติ' : '❌ ปฏิเสธคำขอแล้ว', accept?'ok':'warn');
 }
 
 // ============================================================
-// SWAP ADMIN PANEL
+// SWAP TAB
+// ============================================================
+function swapTabPinLogin() {
+  const inp = document.getElementById('swap-tab-pin-input');
+  const errEl = document.getElementById('swap-tab-pin-err');
+  const pin = inp?.value?.trim();
+  if (!pin || pin.length !== 4) { if(errEl) errEl.textContent = 'กรุณาใส่ PIN 4 หลัก'; return; }
+  const matched = residents.find(r => r.pin === pin);
+  if (!matched) { if(errEl) errEl.textContent = 'PIN ไม่ถูกต้อง'; return; }
+  _swapTabRid = matched.id;
+  renderSwapTab();
+}
+
+function renderSwapTab() {
+  const body = document.getElementById('swap-tab-body'); if (!body) return;
+  const ri = RI;
+  const reqs = perRot[ri]?.swapRequests||[];
+  const DOW = ['อา','จ','อ','พ','พฤ','ศ','ส'];
+  const sNmS = {M:'☀ เช้า',A:'🌆 บ่าย',N:'🌙 ดึก'};
+  const BNS  = 'border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;font-family:\'Sarabun\',sans-serif;';
+
+  // PIN login / logout strip
+  let loginSec = '';
+  if (!_swapTabRid) {
+    loginSec = `
+      <div style="background:#1e293b;border:1px solid #334155;border-radius:12px;padding:16px;margin-bottom:20px;">
+        <div style="font-size:13px;font-weight:700;color:#94a3b8;margin-bottom:10px;">🔐 ล็อกอินเพื่อดูคำขอที่ส่งมาให้ฉัน</div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input id="swap-tab-pin-input" type="password" maxlength="4" inputmode="numeric" placeholder="PIN 4 หลัก"
+            style="flex:1;padding:8px 12px;border:1px solid #334155;border-radius:8px;background:#0f172a;color:#e2e8f0;font-size:14px;font-family:'Sarabun',sans-serif;"
+            onkeydown="if(event.key==='Enter')swapTabPinLogin()">
+          <button onclick="swapTabPinLogin()" style="padding:8px 16px;background:#1d4ed8;color:#fff;${BNS}">เข้าสู่ระบบ</button>
+        </div>
+        <div id="swap-tab-pin-err" style="color:#f87171;font-size:12px;min-height:16px;margin-top:4px;"></div>
+      </div>`;
+  } else {
+    const r = getR(_swapTabRid);
+    const myPending = reqs.filter(rq => rq.toRid === _swapTabRid && rq.status === 'pending_target');
+    const pendingCards = myPending.length ? myPending.map(req=>{
+      const fromR = getR(req.fromRid);
+      const fromDt = rotDay(ri, req.fromDay), toDt = rotDay(ri, req.toDay);
+      return `<div style="background:#fefce8;border:1px solid #fde68a;border-radius:10px;padding:12px 14px;margin-bottom:10px;">
+        <div style="font-size:13px;font-weight:700;color:#92400e;margin-bottom:8px;">📨 ${fromR?.name||req.fromRid} ขอสลับเวรด้วย</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+          <div style="background:#fff7ed;border-radius:8px;padding:8px;text-align:center;">
+            <div style="font-size:11px;color:#92400e;font-weight:700;">เวรของเขา/เธอ</div>
+            <div style="font-size:13px;font-weight:800;margin-top:2px;">${sNmS[req.fromShift]}</div>
+            <div style="font-size:11px;color:#6b7280;">${DOW[fromDt.getDay()]} ${fromDt.getDate()} ${TH_MONTHS[fromDt.getMonth()+1]}</div>
+          </div>
+          <div style="background:#eff6ff;border-radius:8px;padding:8px;text-align:center;">
+            <div style="font-size:11px;color:#1d4ed8;font-weight:700;">เวรของฉัน (ถูกขอ)</div>
+            <div style="font-size:13px;font-weight:800;margin-top:2px;">${sNmS[req.toShift]}</div>
+            <div style="font-size:11px;color:#6b7280;">${DOW[toDt.getDay()]} ${toDt.getDate()} ${TH_MONTHS[toDt.getMonth()+1]}</div>
+          </div>
+        </div>
+        ${req.note?`<div style="font-size:11px;color:#92400e;margin-bottom:8px;">"${req.note}"</div>`:''}
+        <div style="display:flex;gap:8px;">
+          <button onclick="respondSwap('${req.id}',${ri},true)" style="flex:1;padding:8px;background:#059669;color:#fff;${BNS}">✓ ยอมรับ</button>
+          <button onclick="respondSwap('${req.id}',${ri},false)" style="flex:1;padding:8px;background:#dc2626;color:#fff;${BNS}">✗ ปฏิเสธ</button>
+        </div>
+      </div>`;
+    }).join('') : '<div style="color:#64748b;font-size:13px;padding:12px 0;">ไม่มีคำขอที่รอการยืนยัน</div>';
+    loginSec = `
+      <div style="background:#1e293b;border:1px solid #334155;border-radius:12px;padding:12px 14px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;">
+        <div style="font-size:13px;color:#94a3b8;">👤 <span style="color:${r?.color||'#e2e8f0'};font-weight:700;">R${r?.year} ${r?.name}</span></div>
+        <button onclick="_swapTabRid=null;renderSwapTab()" style="background:none;border:none;color:#64748b;font-size:12px;cursor:pointer;font-family:'Sarabun',sans-serif;">ออกจากระบบ</button>
+      </div>
+      <div style="font-size:13px;font-weight:700;color:#94a3b8;margin-bottom:10px;">📨 คำขอที่ส่งมาให้ฉัน</div>
+      ${pendingCards}`;
+  }
+
+  // Admin: target_accepted → final approve/reject
+  const adminReqs = isAdminMode() ? reqs.filter(r=>r.status==='target_accepted') : [];
+  const adminSec = adminReqs.length ? `
+    <div style="margin-top:28px;">
+      <div style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#92400e;margin-bottom:12px;">📋 รออนุมัติ Admin (${adminReqs.length})</div>
+      ${adminReqs.map(req=>{
+        const fromR=getR(req.fromRid), toR=getR(req.toRid);
+        const fromDt=rotDay(ri,req.fromDay), toDt=rotDay(ri,req.toDay);
+        return `<div style="background:#fff;border:1px solid #fde68a;border-radius:10px;padding:12px 14px;margin-bottom:10px;">
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
+            <span style="font-size:13px;font-weight:700;">${fromR?.name||req.fromRid}</span>
+            <span style="font-size:12px;color:#6b7280;">${sNmS[req.fromShift]} ${fromDt.getDate()} ${TH_MONTHS[fromDt.getMonth()+1]}</span>
+            <span style="color:#94a3b8;font-size:14px;">⇄</span>
+            <span style="font-size:13px;font-weight:700;">${toR?.name||req.toRid}</span>
+            <span style="font-size:12px;color:#6b7280;">${sNmS[req.toShift]} ${toDt.getDate()} ${TH_MONTHS[toDt.getMonth()+1]}</span>
+          </div>
+          ${req.note?`<div style="font-size:11px;color:#92400e;margin-bottom:8px;">"${req.note}"</div>`:''}
+          <div style="display:flex;gap:8px;">
+            <button onclick="approveSwap('${req.id}',${ri})" style="flex:1;padding:8px;background:#059669;color:#fff;${BNS}">✓ อนุมัติสลับ</button>
+            <button onclick="rejectSwap('${req.id}',${ri})"  style="flex:1;padding:8px;background:#dc2626;color:#fff;${BNS}">✗ ปฏิเสธ</button>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>` : '';
+
+  // History
+  const history = reqs.filter(r=>['target_rejected','admin_approved','admin_rejected'].includes(r.status));
+  const historySec = history.length ? `
+    <details style="margin-top:28px;">
+      <summary style="font-size:12px;font-weight:700;color:#475569;cursor:pointer;padding:8px 0;">ประวัติคำขอ (${history.length})</summary>
+      <div style="margin-top:8px;">
+        ${history.map(req=>{
+          const fromR=getR(req.fromRid), toR=getR(req.toRid);
+          const fromDt=rotDay(ri,req.fromDay||req.day);
+          const toDt=req.toDay?rotDay(ri,req.toDay):null;
+          const [tag,bg]={target_rejected:['❌ ปฏิเสธ','#fee2e2'],admin_approved:['✅ อนุมัติ','#d1fae5'],admin_rejected:['❌ Admin ปฏิเสธ','#fee2e2']}[req.status]||['?','#f3f4f6'];
+          return `<div style="background:${bg};border-radius:8px;padding:10px 12px;margin-bottom:8px;font-size:12px;">
+            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+              <span style="font-weight:700;">${fromR?.name||req.fromRid}</span>
+              <span style="color:#6b7280;">${sNmS[req.fromShift||req.shift||'M']} ${fromDt.getDate()} ${TH_MONTHS[fromDt.getMonth()+1]}</span>
+              ${toDt?`<span style="color:#94a3b8;">⇄</span>
+              <span style="font-weight:700;">${toR?.name||req.toRid||''}</span>
+              <span style="color:#6b7280;">${sNmS[req.toShift||'M']} ${toDt.getDate()} ${TH_MONTHS[toDt.getMonth()+1]}</span>`:''}
+              <span style="margin-left:auto;font-weight:700;">${tag}</span>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    </details>` : '';
+
+  // ── Public dashboard: all swap requests ──────────────────────
+  const STATUS_META = {
+    pending_target: { label:'⏳ รอยืนยัน',     bg:'#fef3c7', col:'#92400e' },
+    target_accepted:{ label:'✅ รอ Admin',      bg:'#d1fae5', col:'#065f46' },
+    target_rejected:{ label:'❌ ปฏิเสธ',        bg:'#fee2e2', col:'#991b1b' },
+    admin_approved: { label:'✅ อนุมัติแล้ว',   bg:'#bbf7d0', col:'#14532d' },
+    admin_rejected: { label:'❌ Admin ปฏิเสธ',  bg:'#fecaca', col:'#7f1d1d' },
+  };
+  const allReqs = [...reqs].sort((a,b)=>{
+    const order={pending_target:0,target_accepted:1,target_rejected:2,admin_approved:3,admin_rejected:3};
+    return (order[a.status]??4)-(order[b.status]??4) || b.createdAt-a.createdAt;
+  });
+  const dashboardSec = allReqs.length ? `
+    <div style="margin-bottom:28px;">
+      <div style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8;margin-bottom:12px;">📋 ตารางคำขอสลับเวรทั้งหมด (${allReqs.length})</div>
+      <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:12px;">
+          <thead>
+            <tr style="background:#1e293b;color:#94a3b8;">
+              <th style="padding:8px 10px;text-align:left;border-bottom:1px solid #334155;white-space:nowrap;">ผู้ขอ</th>
+              <th style="padding:8px 10px;text-align:left;border-bottom:1px solid #334155;white-space:nowrap;">เวรที่ขอ</th>
+              <th style="padding:8px 10px;text-align:center;border-bottom:1px solid #334155;white-space:nowrap;">⇄</th>
+              <th style="padding:8px 10px;text-align:left;border-bottom:1px solid #334155;white-space:nowrap;">เป้าหมาย</th>
+              <th style="padding:8px 10px;text-align:left;border-bottom:1px solid #334155;white-space:nowrap;">เวรที่ขอสลับ</th>
+              <th style="padding:8px 10px;text-align:center;border-bottom:1px solid #334155;white-space:nowrap;">สถานะ</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${allReqs.map((req,i)=>{
+              const fromR=getR(req.fromRid), toR=getR(req.toRid);
+              const fromDt=rotDay(ri,req.fromDay||req.day);
+              const toDt=req.toDay?rotDay(ri,req.toDay):null;
+              const sm=STATUS_META[req.status]||{label:req.status,bg:'#f3f4f6',col:'#374151'};
+              const rowBg=i%2===0?'#0f172a':'#1a2335';
+              return `<tr style="background:${rowBg};">
+                <td style="padding:8px 10px;font-weight:700;color:${fromR?.color||'#e2e8f0'};">${fromR?.name||req.fromRid}</td>
+                <td style="padding:8px 10px;color:#e2e8f0;">${sNmS[req.fromShift||req.shift||'M']} ${DOW[fromDt.getDay()]}${fromDt.getDate()}</td>
+                <td style="padding:8px 10px;text-align:center;color:#475569;">⇄</td>
+                <td style="padding:8px 10px;font-weight:700;color:${toR?.color||'#94a3b8'};">${toR?.name||req.toRid||'—'}</td>
+                <td style="padding:8px 10px;color:#e2e8f0;">${toDt?`${sNmS[req.toShift||'M']} ${DOW[toDt.getDay()]}${toDt.getDate()}`:'—'}</td>
+                <td style="padding:8px 10px;text-align:center;">
+                  <span style="background:${sm.bg};color:${sm.col};font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;white-space:nowrap;">${sm.label}</span>
+                </td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>` : `<div style="background:#1e293b;border:1px solid #334155;border-radius:10px;padding:20px;text-align:center;color:#475569;margin-bottom:28px;">ยังไม่มีคำขอสลับเวรใน Rotate นี้</div>`;
+
+  // ── Change log ───────────────────────────────────────────────
+  const logs = perRot[ri]?.changeLog||[];
+  const ACTION_META = {
+    shift_edit:         { icon:'✏️', col:'#60a5fa' },
+    swap_approved:      { icon:'✅', col:'#34d399' },
+    swap_rejected:      { icon:'❌', col:'#f87171' },
+    swap_target_accept: { icon:'👍', col:'#a3e635' },
+    swap_target_reject: { icon:'👎', col:'#fb923c' },
+    auto_schedule:      { icon:'🤖', col:'#c084fc' },
+  };
+  const fmtTs = ts => {
+    const d = new Date(ts);
+    const pad = n => String(n).padStart(2,'0');
+    return `${d.getDate()} ${TH_MONTHS[d.getMonth()+1]} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+  const logSec = `
+    <details style="margin-top:8px;">
+      <summary style="font-size:13px;font-weight:700;color:#94a3b8;cursor:pointer;padding:8px 0;display:flex;align-items:center;gap:8px;">
+        <span>📜 Log การเปลี่ยนแปลง (${logs.length})</span>
+      </summary>
+      <div style="margin-top:10px;max-height:400px;overflow-y:auto;border:1px solid #334155;border-radius:10px;">
+        ${logs.length ? logs.slice(0,200).map((l,i)=>{
+          const am=ACTION_META[l.action]||{icon:'•',col:'#94a3b8'};
+          return `<div style="display:flex;gap:10px;align-items:flex-start;padding:8px 12px;border-bottom:1px solid #1e293b;background:${i%2===0?'#0f172a':'#111827'};">
+            <span style="font-size:14px;flex-shrink:0;">${am.icon}</span>
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:12px;color:${am.col};font-weight:600;">${l.desc||l.action}</div>
+              <div style="font-size:11px;color:#475569;margin-top:1px;">${fmtTs(l.ts)}</div>
+            </div>
+          </div>`;
+        }).join('') : '<div style="padding:16px;text-align:center;color:#475569;font-size:13px;">ยังไม่มีรายการ</div>'}
+      </div>
+    </details>`;
+
+  body.innerHTML = `
+    <div style="max-width:640px;margin:0 auto;padding:0 16px;">
+      <div style="font-size:16px;font-weight:800;margin-bottom:20px;">🔄 การขอสลับเวร</div>
+      ${dashboardSec}
+      ${loginSec}
+      ${adminSec}
+      ${historySec}
+      ${logSec}
+    </div>`;
+}
+
+// ============================================================
+// SWAP ADMIN PANEL (schedule tab badge)
 // ============================================================
 function renderSwapAdminPanel() {
   const el = document.getElementById('swap-admin-panel'); if (!el) return;
   const ri = RI;
-  const reqs = (perRot[ri]?.swapRequests||[]).filter(s=>s.status==='pending');
+  const reqs = (perRot[ri]?.swapRequests||[]).filter(s=>s.status==='target_accepted');
   if (!reqs.length) { el.style.display='none'; return; }
   el.style.display = 'block';
-  const DOW_TH3=['อา','จ','อ','พ','พฤ','ศ','ส'];
+  const DOW=['อา','จ','อ','พ','พฤ','ศ','ส'];
+  const sNmS={M:'☀ เช้า',A:'🌆 บ่าย',N:'🌙 ดึก'};
   el.innerHTML = `
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-      <div style="font-weight:700;font-size:14px;color:#92400e;">📌 คำขอสลับเวร (${reqs.length} รายการ)</div>
-    </div>
+    <div style="font-weight:700;font-size:14px;color:#92400e;margin-bottom:12px;">📌 รออนุมัติสลับเวร (${reqs.length} รายการ)</div>
     ${reqs.map(req=>{
-      const r = getR(req.fromRid);
-      const dt = rotDay(ri, req.day);
-      const sName = {M:'☀ เช้า',A:'🌆 บ่าย',N:'🌙 ดึก'}[req.shift];
+      const fromR=getR(req.fromRid), toR=getR(req.toRid);
+      const fromDt=rotDay(ri,req.fromDay||req.day), toDt=req.toDay?rotDay(ri,req.toDay):null;
       return `<div style="background:#fff;border:1px solid #fde68a;border-radius:8px;padding:10px 12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
         <div>
-          <div style="font-size:13px;font-weight:700;color:${r?.color||'#0f172a'};">R${r?.year} ${r?.name||req.fromRid}</div>
-          <div style="font-size:12px;color:#6b7280;">${sName} — ${DOW_TH3[dt.getDay()]} ${dt.getDate()} ${TH_MONTHS[dt.getMonth()+1]}</div>
+          <div style="font-size:13px;font-weight:700;">${fromR?.name||req.fromRid} ⇄ ${toR?.name||req.toRid||'?'}</div>
+          <div style="font-size:12px;color:#6b7280;">${sNmS[req.fromShift||req.shift]} ${fromDt.getDate()} ${TH_MONTHS[fromDt.getMonth()+1]}${toDt?` ⇄ ${sNmS[req.toShift||'M']} ${toDt.getDate()} ${TH_MONTHS[toDt.getMonth()+1]}`:''}
+          </div>
           ${req.note?`<div style="font-size:11px;color:#92400e;margin-top:2px;">"${req.note}"</div>`:''}
         </div>
         <div style="display:flex;gap:8px;">
@@ -2006,20 +2345,39 @@ function renderSwapAdminPanel() {
 function approveSwap(reqId, ri) {
   if (guardAdmin()) return;
   const req = (perRot[ri].swapRequests||[]).find(s=>s.id===reqId); if (!req) return;
-  // Remove person from that shift
-  const arr = perRot[ri].sched[req.day]?.[req.shift];
-  if (arr) perRot[ri].sched[req.day][req.shift] = arr.filter(id=>id!==req.fromRid);
-  req.status = 'approved';
-  saveState(); renderTable(); renderSwapAdminPanel();
-  showToast(`✅ อนุมัติ — นำ ${getR(req.fromRid)?.name||req.fromRid} ออกจาก${req.shift}เวรแล้ว`,'ok');
+  // Swap fromRid ↔ toRid between their respective shifts
+  const fromSched = perRot[ri].sched[req.fromDay]?.[req.fromShift];
+  const toSched   = perRot[ri].sched[req.toDay]?.[req.toShift];
+  if (fromSched) {
+    perRot[ri].sched[req.fromDay][req.fromShift] = fromSched.filter(id=>id!==req.fromRid);
+    if (!perRot[ri].sched[req.fromDay][req.fromShift].includes(req.toRid))
+      perRot[ri].sched[req.fromDay][req.fromShift].push(req.toRid);
+  }
+  if (toSched) {
+    perRot[ri].sched[req.toDay][req.toShift] = toSched.filter(id=>id!==req.toRid);
+    if (!perRot[ri].sched[req.toDay][req.toShift].includes(req.fromRid))
+      perRot[ri].sched[req.toDay][req.toShift].push(req.fromRid);
+  }
+  req.status = 'admin_approved';
+  const fromR=getR(req.fromRid), toR=getR(req.toRid);
+  const sNmS={M:'เช้า',A:'บ่าย',N:'ดึก'};
+  const fdt=rotDay(ri,req.fromDay), tdt=rotDay(ri,req.toDay);
+  logChange(ri,'swap_approved',
+    `Admin อนุมัติ: ${fromR?.name||req.fromRid} เวร${sNmS[req.fromShift]} ${fdt.getDate()} ${TH_MONTHS[fdt.getMonth()+1]} ⇄ ${toR?.name||req.toRid} เวร${sNmS[req.toShift]} ${tdt.getDate()} ${TH_MONTHS[tdt.getMonth()+1]}`);
+  saveState(); renderTable(); renderSwapTab(); renderSwapAdminPanel();
+  showToast(`✅ สลับเวร ${fromR?.name||req.fromRid} ⇄ ${toR?.name||req.toRid} สำเร็จ`,'ok');
 }
 
 function rejectSwap(reqId, ri) {
   if (guardAdmin()) return;
   const req = (perRot[ri].swapRequests||[]).find(s=>s.id===reqId); if (!req) return;
-  req.status = 'rejected';
-  saveState(); renderSwapAdminPanel();
-  showToast('ปฏิเสธคำขอแล้ว','ok');
+  req.status = 'admin_rejected';
+  const fromR=getR(req.fromRid), toR=getR(req.toRid);
+  const sNmS={M:'เช้า',A:'บ่าย',N:'ดึก'};
+  logChange(ri,'swap_rejected',
+    `Admin ปฏิเสธ: ${fromR?.name||req.fromRid} ⇄ ${toR?.name||req.toRid||'?'} (เวร${sNmS[req.fromShift||req.shift||'M']})`);
+  saveState(); renderSwapTab(); renderSwapAdminPanel();
+  showToast('ปฏิเสธคำขอสลับเวรแล้ว','ok');
 }
 
 // ============================================================
@@ -3005,6 +3363,7 @@ function autoSchedule(fillMode=true) {
     }
   }
 
+  logChange(ri,'auto_schedule', fillMode ? 'Auto-fill ตาราง (เติมจากของเดิม)' : 'Auto-schedule สร้างตารางใหม่ทั้งหมด');
   saveState(); renderTable(); updateUndoRedoBtns();
   // แสดง post-schedule summary
   setTimeout(() => showPostSchedSummary(ri, fillMode), 300);
@@ -3780,10 +4139,15 @@ function toggleAssign(rid,d,shift){
   if (guardLocked()) return;
   const ri=RI, arr=perRot[ri].sched[d][shift];
   const idx=arr.indexOf(rid);
+  const sNm={M:'เช้า',A:'บ่าย',N:'ดึก'}[shift];
+  const rNm=getR(rid)?.name||rid;
+  const dt=rotDay(ri,d);
+  const dStr=`${dt.getDate()} ${TH_MONTHS[dt.getMonth()+1]}`;
   if(idx>=0){
     // Remove — push undo first
     pushUndo();
     arr.splice(idx,1);
+    logChange(ri,'shift_edit',`ถอด ${rNm} ออกจากเวร${sNm} วันที่ ${dStr}`);
   } else {
     // ตรวจกฎ 2 ข้อเท่านั้น
     // กฎ 1: บ่าย + ดึก วันเดียวกัน
@@ -3800,6 +4164,7 @@ function toggleAssign(rid,d,shift){
     if(alreadyToday(rid,ri,d)) showToast('⚠ Double shift วันนี้','ok');
     pushUndo();
     arr.push(rid);
+    logChange(ri,'shift_edit',`เพิ่ม ${rNm} เข้าเวร${sNm} วันที่ ${dStr}`);
   }
   _shiftCntCache = null; saveState(); openModal(d,shift); renderTable(); updateUndoRedoBtns();
 }
@@ -3879,6 +4244,7 @@ function switchTab(tab,btn){
   if(btn) btn.classList.add('active');
   if(tab==='residents') renderResGrid();
   if(tab==='leaves'){ renderLeaveSelect(); renderLeaveList(); renderDayoffLockUI(); updateAdminUI(); }
+  if(tab==='swap') renderSwapTab();
   if(tab==='fairness') renderFairness();
   if(tab==='settings'){ renderResManageGrid(); renderConfDays(); renderICalButtons(); }
 }
@@ -3887,6 +4253,7 @@ function renderAll(){
   renderTable();
   if(document.getElementById('tab-residents')?.classList.contains('active')) renderResGrid();
   if(document.getElementById('tab-leaves')?.classList.contains('active')){ renderLeaveSelect(); renderLeaveList(); }
+  if(document.getElementById('tab-swap')?.classList.contains('active')) renderSwapTab();
   if(document.getElementById('tab-fairness')?.classList.contains('active')) renderFairness();
   if(document.getElementById('tab-settings')?.classList.contains('active')){ renderResManageGrid(); renderConfDays(); }
 }
