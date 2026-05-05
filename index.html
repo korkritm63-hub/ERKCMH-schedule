@@ -494,6 +494,21 @@ th.col-N{min-width:185px;background:#3b0764;border-left:3px solid #8b5cf6;}
 .email-chip-rm{background:none;border:none;cursor:pointer;color:#93c5fd;font-size:13px;padding:0 2px;line-height:1;}
 .email-chip-rm:hover{color:#dc2626;}
 .capture-overlay{position:fixed;top:0;left:0;background:rgba(15,23,42,.7);color:#fff;font-size:14px;font-weight:600;z-index:999;display:flex;align-items:center;justify-content:center;gap:12px;}
+/* ── Personal View ──────────────────────────────────────────── */
+#pv-overlay{position:fixed;inset:0;background:#0f172a;z-index:600;display:none;flex-direction:column;overflow-y:auto;font-family:'Sarabun',sans-serif;color:#e2e8f0;}
+.pv-pin-dot{width:14px;height:14px;border-radius:50%;background:#334155;transition:.15s;flex-shrink:0;}
+.pv-pin-dot.filled{background:#3b82f6;}
+.pv-numpad-btn{width:68px;height:68px;border-radius:50%;border:1px solid #334155;background:#1e293b;color:#e2e8f0;font-size:22px;font-weight:700;cursor:pointer;font-family:'Sarabun',sans-serif;transition:.1s;}
+.pv-numpad-btn:active{background:#334155;transform:scale(.94);}
+.pv-shift-card{background:#1e293b;border:1px solid #334155;border-radius:12px;padding:14px 16px;margin-bottom:10px;cursor:default;}
+.pv-shift-card.erou{border-color:#f59e0b;box-shadow:0 0 0 1px #f59e0b30;}
+.pv-shift-card.today{border-color:#3b82f6;}
+.swap-tag{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700;}
+.swap-tag.pending{background:#fef3c7;color:#92400e;}
+.swap-tag.approved{background:#d1fae5;color:#065f46;}
+.swap-tag.rejected{background:#fee2e2;color:#991b1b;}
+/* ── Swap Admin Panel ──────────────────────────────────────── */
+.swap-admin-card{background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:14px 18px;margin-bottom:14px;}
 </style>
 </head>
 <body>
@@ -507,6 +522,7 @@ th.col-N{min-width:185px;background:#3b0764;border-left:3px solid #8b5cf6;}
   <div style="display:flex;align-items:center;gap:10px">
     <div class="save-ind" id="save-ind"><div class="save-dot" style="background:#22c55e"></div><span>บันทึกแล้ว</span></div>
     <div style="display:flex;gap:5px;align-items:center">
+      <button id="pv-nav-btn" class="nav-btn" onclick="openPersonalView()" title="ดูตารางเวรของฉัน">👤 My</button>
       <button id="admin-nav-btn" class="nav-btn" style="display:none" title="Admin mode">🔒 Admin</button>
       <button class="nav-btn active" onclick="switchTab('schedule',this)">📅 ตาราง</button>
       <button class="nav-btn" onclick="switchTab('residents',this)">👨‍⚕️ Residents</button>
@@ -561,6 +577,9 @@ th.col-N{min-width:185px;background:#3b0764;border-left:3px solid #8b5cf6;}
     <div class="rotate-chips" id="rotate-chips"></div>
     <button class="add-rotate-btn" onclick="openAddRotate()">＋ Add Rotate</button>
   </div>
+
+  <!-- SWAP REQUESTS ADMIN PANEL -->
+  <div id="swap-admin-panel" style="display:none;" class="swap-admin-card"></div>
 
   <!-- LOCK BANNER -->
   <div id="lock-banner" style="display:none;align-items:center;gap:10px;background:#fef3c7;border:1px solid #fde68a;border-radius:10px;padding:10px 16px;margin-bottom:12px;">
@@ -782,6 +801,42 @@ th.col-N{min-width:185px;background:#3b0764;border-left:3px solid #8b5cf6;}
     <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px">เลือก Resident</div>
     <div class="picker-list" id="modal-picker"></div>
     <div class="modal-actions"><button class="btn btn-outline" onclick="closeModal()">ปิด</button></div>
+  </div>
+</div>
+
+<!-- PERSONAL VIEW OVERLAY -->
+<div id="pv-overlay">
+  <!-- PIN Screen -->
+  <div id="pv-pin-screen" style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:32px 16px;gap:28px;">
+    <div style="text-align:center;">
+      <div style="font-size:36px;margin-bottom:10px;">👤</div>
+      <div style="font-size:20px;font-weight:800;color:#f1f5f9;">ดูตารางเวรของฉัน</div>
+      <div style="font-size:13px;color:#64748b;margin-top:6px;">กรุณาใส่ PIN 4 หลักของคุณ</div>
+    </div>
+    <div style="display:flex;gap:14px;align-items:center;" id="pv-dots"></div>
+    <div id="pv-pin-error" style="color:#f87171;font-size:13px;min-height:18px;"></div>
+    <div style="display:grid;grid-template-columns:repeat(3,68px);gap:12px;">
+      <button class="pv-numpad-btn" onclick="pvPinInput('1')">1</button>
+      <button class="pv-numpad-btn" onclick="pvPinInput('2')">2</button>
+      <button class="pv-numpad-btn" onclick="pvPinInput('3')">3</button>
+      <button class="pv-numpad-btn" onclick="pvPinInput('4')">4</button>
+      <button class="pv-numpad-btn" onclick="pvPinInput('5')">5</button>
+      <button class="pv-numpad-btn" onclick="pvPinInput('6')">6</button>
+      <button class="pv-numpad-btn" onclick="pvPinInput('7')">7</button>
+      <button class="pv-numpad-btn" onclick="pvPinInput('8')">8</button>
+      <button class="pv-numpad-btn" onclick="pvPinInput('9')">9</button>
+      <button class="pv-numpad-btn" onclick="pvPinClear()" style="font-size:16px;">✕ ล้าง</button>
+      <button class="pv-numpad-btn" onclick="pvPinInput('0')">0</button>
+      <button class="pv-numpad-btn" onclick="pvPinSubmit()" style="background:#1d4ed8;border-color:#3b82f6;color:#fff;font-size:16px;">✓</button>
+    </div>
+    <button onclick="closePersonalView()" style="background:none;border:none;color:#64748b;font-size:13px;cursor:pointer;font-family:'Sarabun',sans-serif;">✕ ปิด</button>
+  </div>
+  <!-- Dashboard -->
+  <div id="pv-dashboard" style="display:none;max-width:560px;margin:0 auto;padding:20px 16px;width:100%;">
+    <div id="pv-header"></div>
+    <div id="pv-stats" style="margin:16px 0;"></div>
+    <div id="pv-swap-pending"></div>
+    <div id="pv-shifts"></div>
   </div>
 </div>
 
@@ -1291,6 +1346,7 @@ function createRotate(startStr, endStr=null, customLabel=null) {
     active: Object.fromEntries(RES.map(r=>[r.id, true])),
     sched: Object.fromEntries(Array.from({length:rot.days},(_,i)=>[i+1,{M:[],A:[],N:[]}])),
     confDays: [], // [{date:'YYYY-MM-DD', type:'IH'|'Tox'|'EMS'}]
+    swapRequests: [], // [{id, fromRid, toRid, ri, day, shift, note, status, createdAt}]
     outsiders: [], // [{id, name, quota, active}]
     outsideFlags: {}, // {d: {shift: [rid, ...]}} — toggle วนนอกแผนก
     dayoffLocked: false, // admin ล็อกรับ dayoff
@@ -1374,6 +1430,7 @@ function loadState() {
         lvs: pr.lvs ?? [],
         holidays: pr.holidays ?? [],
         confDays: pr.confDays ?? [],
+        swapRequests: pr.swapRequests ?? [],
         outsiders: pr.outsiders ?? [],
         outsideFlags: pr.outsideFlags ?? {},
         dayoffLocked: pr.dayoffLocked ?? false,
@@ -1583,9 +1640,9 @@ function icalDate(dt, hour) {
 
 function buildICalEvents(rid, riList) {
   const SHIFT_TIMES = {
-    M: { startH:8,  endH:16 },  // เช้า 08:00-16:00
-    A: { startH:16, endH:24 },  // บ่าย 16:00-00:00 (วันถัดไป)
-    N: { startH:0,  endH:8  },  // ดึก 00:00-08:00
+    M: { startH:8,  endH:16 },
+    A: { startH:16, endH:24 },
+    N: { startH:0,  endH:8  },
   };
   const SHIFT_NAMES = { M:'☀ เวรเช้า ER', A:'🌆 เวรบ่าย ER', N:'🌙 เวรดึก ER' };
   const events = [];
@@ -1595,6 +1652,33 @@ function buildICalEvents(rid, riList) {
     if (!rotates[ri] || !perRot[ri]) return;
     const rot = rotates[ri];
     const days = rotDays(ri);
+
+    // Build EROU map for this rotate (for iCal labeling)
+    const eroCount = {};
+    for (let d2=1; d2<=days; d2++) {
+      for (const s2 of SHIFTS) {
+        const sl2 = perRot[ri].sched[d2]?.[s2]||[];
+        const nR3 = sl2.filter(id=>getR(id)?.year<3);
+        if (nR3.length > 0) {
+          nR3.sort((a,b)=>(eroCount[a]||0)-(eroCount[b]||0));
+          eroCount[nR3[0]] = (eroCount[nR3[0]]||0)+1;
+        }
+      }
+    }
+    // Per-shift EROU lookup
+    const shiftErou = {};
+    const eroRun = {};
+    for (let d2=1; d2<=days; d2++) {
+      for (const s2 of SHIFTS) {
+        const sl2 = perRot[ri].sched[d2]?.[s2]||[];
+        const nR3 = sl2.filter(id=>getR(id)?.year<3);
+        if (nR3.length > 0) {
+          nR3.sort((a,b)=>(eroRun[a]||0)-(eroRun[b]||0));
+          shiftErou[`${d2}:${s2}`] = nR3[0];
+          eroRun[nR3[0]] = (eroRun[nR3[0]]||0)+1;
+        }
+      }
+    }
 
     for (let d=1; d<=days; d++) {
       const dayDt = new Date(rot.startDate);
@@ -1607,19 +1691,29 @@ function buildICalEvents(rid, riList) {
 
         const {startH, endH} = SHIFT_TIMES[shift];
         const uid = `ercu-r${ri}-d${d}-${shift}-${++uidCounter}@kcmh`;
-        const names = targets.map(id=>getR(id)?.name||id).join(', ');
+        const isErou = rid && shiftErou[`${d}:${shift}`] === rid;
         const others = rid ? assigned.filter(x=>x!==rid).map(id=>getR(id)?.name||id).join(', ') : '';
-        const summary = rid ? `${SHIFT_NAMES[shift]} จุฬาฯ` : `${SHIFT_NAMES[shift]} — ${names}`;
-        const desc = rid && others ? `อยู่เวรกับ: ${others}` : '';
+        const summary = rid
+          ? `${SHIFT_NAMES[shift]}${isErou?' ⭐EROU':''} — ${rot.label}`
+          : `${SHIFT_NAMES[shift]} — ${assigned.map(id=>getR(id)?.name||id).join(', ')}`;
+        const descParts = [];
+        if (rid && others) descParts.push(`อยู่เวรกับ: ${others}`);
+        if (isErou) descParts.push('คุณเป็น EROU (หัวหน้าเวร) วันนี้');
 
         events.push('BEGIN:VEVENT');
         events.push(`UID:${uid}`);
         events.push(`DTSTART:${icalDate(dayDt, startH)}`);
-        events.push(`DTEND:${icalDate(dayDt, endH)}`);   // icalDate handles endH=24 → next day 00:00
+        events.push(`DTEND:${icalDate(dayDt, endH)}`);
         events.push(`SUMMARY:${summary}`);
-        if (desc) events.push(`DESCRIPTION:${desc}`);
+        if (descParts.length) events.push(`DESCRIPTION:${descParts.join('\\n')}`);
         events.push(`LOCATION:ER โรงพยาบาลจุฬาลงกรณ์`);
         events.push(`STATUS:CONFIRMED`);
+        // Reminder 1 hour before
+        events.push('BEGIN:VALARM');
+        events.push('ACTION:DISPLAY');
+        events.push(`DESCRIPTION:เตือน — ${SHIFT_NAMES[shift]}${isErou?' ⭐EROU':''}`);
+        events.push('TRIGGER:-PT60M');
+        events.push('END:VALARM');
         events.push('END:VEVENT');
       });
     }
@@ -1685,6 +1779,247 @@ function renderICalButtons() {
       ${r.name}
     </button>`
   ).join('');
+}
+
+// ============================================================
+// PERSONAL VIEW
+// ============================================================
+let _pvPin = '';
+let _pvRid = null;
+
+function openPersonalView() {
+  _pvPin = ''; _pvRid = null;
+  document.getElementById('pv-overlay').style.display = 'flex';
+  document.getElementById('pv-pin-screen').style.display = 'flex';
+  document.getElementById('pv-dashboard').style.display = 'none';
+  document.getElementById('pv-pin-error').textContent = '';
+  _pvRenderDots();
+}
+function closePersonalView() {
+  document.getElementById('pv-overlay').style.display = 'none';
+  _pvPin = ''; _pvRid = null;
+}
+function _pvRenderDots() {
+  document.getElementById('pv-dots').innerHTML =
+    [0,1,2,3].map(i=>`<div class="pv-pin-dot${i<_pvPin.length?' filled':''}"></div>`).join('');
+}
+function pvPinInput(d) {
+  if (_pvPin.length >= 4) return;
+  _pvPin += d;
+  _pvRenderDots();
+  if (_pvPin.length === 4) setTimeout(pvPinSubmit, 150);
+}
+function pvPinClear() { _pvPin = ''; _pvRenderDots(); document.getElementById('pv-pin-error').textContent=''; }
+function pvPinSubmit() {
+  const r = RES.find(r => r.pin === _pvPin);
+  if (!r) {
+    document.getElementById('pv-pin-error').textContent = '❌ PIN ไม่ถูกต้อง กรุณาลองใหม่';
+    _pvPin = ''; _pvRenderDots(); return;
+  }
+  _pvRid = r.id;
+  document.getElementById('pv-pin-screen').style.display = 'none';
+  document.getElementById('pv-dashboard').style.display = 'block';
+  _pvRenderDashboard(r.id);
+}
+function _pvRenderDashboard(rid) {
+  const r = getR(rid); if (!r) return;
+  const ri = RI;
+  const rot = rotates[ri];
+  const days = rotDays(ri);
+  const today = new Date(); today.setHours(0,0,0,0);
+
+  // Header
+  document.getElementById('pv-header').innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+      <button onclick="closePersonalView()" style="background:none;border:none;color:#64748b;font-size:22px;cursor:pointer;padding:0;line-height:1;">←</button>
+      <div style="text-align:center;">
+        <div style="font-size:18px;font-weight:800;color:${r.color};">R${r.year} ${r.name}</div>
+        <div style="font-size:12px;color:#64748b;">${rot.label} · ${rot.dateRange}</div>
+      </div>
+      <button onclick="exportICalPerson('${rid}')" style="background:#1e293b;border:1px solid #334155;color:#94a3b8;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:12px;font-family:'Sarabun',sans-serif;">📅 .ics</button>
+    </div>`;
+
+  // Stats
+  const ct = shiftCntByType(rid, ri);
+  let eroCount = 0;
+  const eroRun = {};
+  for (let d=1; d<=days; d++) {
+    for (const s of SHIFTS) {
+      const sl = perRot[ri].sched[d]?.[s]||[];
+      const nR3 = sl.filter(id=>getR(id)?.year<3);
+      if (nR3.length>0) {
+        nR3.sort((a,b)=>(eroRun[a]||0)-(eroRun[b]||0));
+        eroRun[nR3[0]]=(eroRun[nR3[0]]||0)+1;
+        if(nR3[0]===rid) eroCount++;
+      }
+    }
+  }
+  const quota = QUOTA[r.year];
+  const pct = Math.round(ct.total/quota*100);
+  document.getElementById('pv-stats').innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;text-align:center;">
+      ${[['☀','M',ct.M,'#b45309'],['🌆','A',ct.A,'#1d4ed8'],['🌙','N',ct.N,'#7c3aed'],['⭐','EROU',eroCount,'#d97706']].map(([icon,label,val,col])=>`
+        <div style="background:#1e293b;border-radius:10px;padding:12px 6px;border:1px solid #334155;">
+          <div style="font-size:20px;">${icon}</div>
+          <div style="font-size:22px;font-weight:800;color:${col};">${val}</div>
+          <div style="font-size:11px;color:#64748b;">${label}</div>
+        </div>`).join('')}
+    </div>
+    <div style="margin-top:10px;background:#1e293b;border-radius:10px;padding:10px 14px;border:1px solid #334155;">
+      <div style="display:flex;justify-content:space-between;font-size:12px;color:#94a3b8;margin-bottom:6px;">
+        <span>รวมเวร</span><span style="color:${ct.total===quota?'#22c55e':ct.total>quota?'#ef4444':'#f59e0b'};font-weight:700;">${ct.total} / ${quota}</span>
+      </div>
+      <div style="background:#334155;border-radius:4px;height:6px;overflow:hidden;"><div style="height:100%;background:${ct.total>=quota?'#22c55e':'#3b82f6'};width:${Math.min(pct,100)}%;transition:.3s;"></div></div>
+    </div>`;
+
+  // Pending swap requests
+  const pending = (perRot[ri].swapRequests||[]).filter(s=>s.fromRid===rid);
+  const pendHtml = pending.length ? `
+    <div style="margin-bottom:16px;">
+      <div style="font-size:12px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">คำขอสลับเวรของฉัน</div>
+      ${pending.map(sw=>{
+        const dt = rotDay(ri,sw.day);
+        return `<div style="background:#1e293b;border:1px solid #334155;border-radius:10px;padding:10px 12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <div style="font-size:13px;font-weight:700;">${{M:'☀ เช้า',A:'🌆 บ่าย',N:'🌙 ดึก'}[sw.shift]} — ${dt.getDate()} ${TH_MONTHS[dt.getMonth()+1]}</div>
+            ${sw.note?`<div style="font-size:11px;color:#64748b;margin-top:2px;">"${sw.note}"</div>`:''}
+          </div>
+          <span class="swap-tag ${sw.status}">${{pending:'⏳ รอ admin',approved:'✅ อนุมัติ',rejected:'❌ ปฏิเสธ'}[sw.status]}</span>
+        </div>`;
+      }).join('')}
+    </div>` : '';
+  document.getElementById('pv-swap-pending').innerHTML = pendHtml;
+
+  // Shift list
+  const shifts = [];
+  for (let d=1; d<=days; d++) {
+    for (const s of SHIFTS) {
+      if ((perRot[ri].sched[d]?.[s]||[]).includes(rid)) {
+        const dt = rotDay(ri,d); dt.setHours(0,0,0,0);
+        shifts.push({d, s, dt});
+      }
+    }
+  }
+  shifts.sort((a,b)=>a.dt-b.dt||(SHIFTS.indexOf(a.s)-SHIFTS.indexOf(b.s)));
+
+  // Rebuild ero map for per-shift lookup
+  const eroMap = {}; const eroR2 = {};
+  for (let d=1; d<=days; d++) {
+    for (const s of SHIFTS) {
+      const sl = perRot[ri].sched[d]?.[s]||[];
+      const nR3 = sl.filter(id=>getR(id)?.year<3);
+      if (nR3.length>0) {
+        nR3.sort((a,b)=>(eroR2[a]||0)-(eroR2[b]||0));
+        eroMap[`${d}:${s}`]=nR3[0]; eroR2[nR3[0]]=(eroR2[nR3[0]]||0)+1;
+      }
+    }
+  }
+
+  const STIME_PV = {M:'08:00–16:00', A:'16:00–00:00', N:'00:00–08:00'};
+  const SCOLOR = {M:'#b45309',A:'#1d4ed8',N:'#7c3aed'};
+  const upcoming = shifts.filter(x=>x.dt>=today);
+  const past     = shifts.filter(x=>x.dt<today);
+
+  const renderCard = (x) => {
+    const dt = rotDay(ri,x.d);
+    const isToday = x.dt.getTime()===today.getTime();
+    const isErou  = eroMap[`${x.d}:${x.s}`]===rid;
+    const others  = (perRot[ri].sched[x.d]?.[x.s]||[]).filter(id=>id!==rid)
+                    .map(id=>{ const rx=getR(id); return rx?rx.name:(perRot[ri].outsiders||[]).find(o=>o.id===id)?.name||id; });
+    const hasPending = (perRot[ri].swapRequests||[]).some(sw=>sw.fromRid===rid&&sw.day===x.d&&sw.shift===x.s&&sw.status==='pending');
+    const DOW_TH2=['อา','จ','อ','พ','พฤ','ศ','ส'];
+    return `<div class="pv-shift-card${isErou?' erou':''}${isToday?' today':''}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+        <div>
+          <div style="font-size:15px;font-weight:800;color:${SCOLOR[x.s]};">${{M:'☀ เวรเช้า',A:'🌆 เวรบ่าย',N:'🌙 เวรดึก'}[x.s]}${isErou?' ⭐EROU':''}</div>
+          <div style="font-size:12px;color:#94a3b8;margin-top:2px;">${DOW_TH2[dt.getDay()]} ${dt.getDate()} ${TH_MONTHS[dt.getMonth()+1]} · ${STIME_PV[x.s]}</div>
+          ${others.length?`<div style="font-size:12px;color:#64748b;margin-top:4px;">อยู่กับ: ${others.join(', ')}</div>`:''}
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
+          ${isToday?'<span style="background:#1d4ed8;color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;">วันนี้</span>':''}
+          ${!hasPending?`<button onclick="pvOpenSwapForm(${x.d},'${x.s}')" style="background:#1e293b;border:1px solid #475569;color:#94a3b8;border-radius:8px;padding:5px 10px;cursor:pointer;font-size:11px;font-family:'Sarabun',sans-serif;">🔄 ขอสลับ</button>`
+            :`<span class="swap-tag pending">⏳ ขอสลับแล้ว</span>`}
+        </div>
+      </div>
+    </div>`;
+  };
+
+  document.getElementById('pv-shifts').innerHTML = `
+    ${upcoming.length?`<div style="font-size:12px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;margin-top:6px;">เวรที่กำลังจะมา (${upcoming.length})</div>${upcoming.map(renderCard).join('')}`:''}
+    ${past.length?`<details style="margin-top:16px;"><summary style="font-size:12px;font-weight:700;color:#475569;cursor:pointer;padding:8px 0;">เวรที่ผ่านมา (${past.length})</summary><div style="margin-top:8px;">${past.map(renderCard).join('')}</div></details>`:''}
+    ${!shifts.length?'<div style="text-align:center;color:#475569;padding:40px 0;">ยังไม่มีเวรใน Rotate นี้</div>':''}`;
+}
+
+function pvOpenSwapForm(day, shift) {
+  const rid = _pvRid; if (!rid) return;
+  const ri = RI;
+  const dt = rotDay(ri, day);
+  const shiftName = {M:'☀ เวรเช้า',A:'🌆 เวรบ่าย',N:'🌙 เวรดึก'}[shift];
+  const note = prompt(`ขอสลับเวร: ${shiftName} วันที่ ${dt.getDate()} ${TH_MONTHS[dt.getMonth()+1]}\n\nใส่โน้ตถึง admin (ไม่บังคับ):`);
+  if (note === null) return; // cancelled
+  const req = {
+    id: 'sw_'+Date.now(),
+    fromRid: rid, toRid: null,
+    ri, day, shift, note: note.trim(),
+    status: 'pending', createdAt: Date.now()
+  };
+  if (!perRot[ri].swapRequests) perRot[ri].swapRequests = [];
+  perRot[ri].swapRequests.push(req);
+  saveState();
+  renderSwapAdminPanel();
+  _pvRenderDashboard(rid); // refresh dashboard
+  showToast('📨 ส่งคำขอสลับเวรแล้ว — admin จะได้รับแจ้ง','ok');
+}
+
+// ============================================================
+// SWAP ADMIN PANEL
+// ============================================================
+function renderSwapAdminPanel() {
+  const el = document.getElementById('swap-admin-panel'); if (!el) return;
+  const ri = RI;
+  const reqs = (perRot[ri]?.swapRequests||[]).filter(s=>s.status==='pending');
+  if (!reqs.length) { el.style.display='none'; return; }
+  el.style.display = 'block';
+  const DOW_TH3=['อา','จ','อ','พ','พฤ','ศ','ส'];
+  el.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <div style="font-weight:700;font-size:14px;color:#92400e;">📌 คำขอสลับเวร (${reqs.length} รายการ)</div>
+    </div>
+    ${reqs.map(req=>{
+      const r = getR(req.fromRid);
+      const dt = rotDay(ri, req.day);
+      const sName = {M:'☀ เช้า',A:'🌆 บ่าย',N:'🌙 ดึก'}[req.shift];
+      return `<div style="background:#fff;border:1px solid #fde68a;border-radius:8px;padding:10px 12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+        <div>
+          <div style="font-size:13px;font-weight:700;color:${r?.color||'#0f172a'};">R${r?.year} ${r?.name||req.fromRid}</div>
+          <div style="font-size:12px;color:#6b7280;">${sName} — ${DOW_TH3[dt.getDay()]} ${dt.getDate()} ${TH_MONTHS[dt.getMonth()+1]}</div>
+          ${req.note?`<div style="font-size:11px;color:#92400e;margin-top:2px;">"${req.note}"</div>`:''}
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button onclick="approveSwap('${req.id}',${ri})" style="background:#059669;color:#fff;border:none;border-radius:7px;padding:6px 14px;cursor:pointer;font-size:13px;font-weight:700;font-family:'Sarabun',sans-serif;">✓ อนุมัติ</button>
+          <button onclick="rejectSwap('${req.id}',${ri})" style="background:#dc2626;color:#fff;border:none;border-radius:7px;padding:6px 14px;cursor:pointer;font-size:13px;font-weight:700;font-family:'Sarabun',sans-serif;">✗ ปฏิเสธ</button>
+        </div>
+      </div>`;
+    }).join('')}`;
+}
+
+function approveSwap(reqId, ri) {
+  if (guardAdmin()) return;
+  const req = (perRot[ri].swapRequests||[]).find(s=>s.id===reqId); if (!req) return;
+  // Remove person from that shift
+  const arr = perRot[ri].sched[req.day]?.[req.shift];
+  if (arr) perRot[ri].sched[req.day][req.shift] = arr.filter(id=>id!==req.fromRid);
+  req.status = 'approved';
+  saveState(); renderTable(); renderSwapAdminPanel();
+  showToast(`✅ อนุมัติ — นำ ${getR(req.fromRid)?.name||req.fromRid} ออกจาก${req.shift}เวรแล้ว`,'ok');
+}
+
+function rejectSwap(reqId, ri) {
+  if (guardAdmin()) return;
+  const req = (perRot[ri].swapRequests||[]).find(s=>s.id===reqId); if (!req) return;
+  req.status = 'rejected';
+  saveState(); renderSwapAdminPanel();
+  showToast('ปฏิเสธคำขอแล้ว','ok');
 }
 
 // ============================================================
@@ -2728,7 +3063,8 @@ function renderTable(){
   _shiftCntCache = null;
   const ri=RI, rot=rotates[ri];
   invalidateLeaderCache(ri);
-  updateLockUI(); // update lock state
+  updateLockUI();
+  renderSwapAdminPanel();
   document.getElementById('rot-title').textContent=`${rot.label}`;
   document.getElementById('rot-sub').textContent=`${rot.dateRange} · ${rot.days||28} DAYS`;
   // Pattern badge
