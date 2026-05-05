@@ -1299,8 +1299,8 @@ let RI = 0; // current rotate index
 
 // Helpers to get actual calendar date from rotate day index
 function rotDay(ri, d) {
-  // d = 1..28, returns Date object
   const r = rotates[ri];
+  if (!r) return new Date();
   const dt = new Date(r.startDate);
   dt.setDate(dt.getDate() + d - 1);
   return dt;
@@ -2128,7 +2128,7 @@ function swapTabPinLogin() {
     return;
   }
   _swapTabRid = matched.id;
-  renderSwapTab();
+  try { renderSwapTab(); } catch(e) { console.error('renderSwapTab error', e); showToast('❌ เกิดข้อผิดพลาด: ' + e.message, 'err'); }
 }
 
 function renderSwapTab() {
@@ -4268,7 +4268,7 @@ function switchTab(tab,btn){
   if(btn) btn.classList.add('active');
   if(tab==='residents') renderResGrid();
   if(tab==='leaves'){ renderLeaveSelect(); renderLeaveList(); renderDayoffLockUI(); updateAdminUI(); }
-  if(tab==='swap') renderSwapTab();
+  if(tab==='swap') try { renderSwapTab(); } catch(e) { console.error('renderSwapTab',e); }
   if(tab==='fairness') renderFairness();
   if(tab==='settings'){ renderResManageGrid(); renderConfDays(); renderICalButtons(); }
 }
