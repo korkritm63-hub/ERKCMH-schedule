@@ -2114,7 +2114,7 @@ function swapTabPinLogin() {
   const errEl = document.getElementById('swap-tab-pin-err');
   const pin = inp?.value?.trim();
   if (!pin || pin.length !== 4) { if(errEl) errEl.textContent = 'กรุณาใส่ PIN 4 หลัก'; return; }
-  const matched = residents.find(r => r.pin === pin);
+  const matched = RES.find(r => r.pin === pin);
   if (!matched) { if(errEl) errEl.textContent = 'PIN ไม่ถูกต้อง'; return; }
   _swapTabRid = matched.id;
   renderSwapTab();
