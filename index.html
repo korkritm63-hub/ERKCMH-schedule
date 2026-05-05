@@ -4441,6 +4441,11 @@ async function downloadPreviewPNG() {
   ov.style.cssText='position:fixed;inset:0;background:rgba(15,23,42,.8);color:#fff;font-size:15px;font-weight:700;z-index:9999;display:flex;align-items:center;justify-content:center;gap:12px;';
   ov.innerHTML='<span style="font-size:28px">📸</span> กำลังสร้างภาพ...';
   document.body.appendChild(ov);
+  // Reset transform so html2canvas captures full paper without clipping/offset
+  const savedTransform = target.style.transform;
+  const savedMargin = target.style.margin;
+  target.style.transform = 'none';
+  target.style.margin = '0';
   try {
     const canvas = await html2canvas(target, { scale:3, useCORS:true, backgroundColor:'#fff', logging:false });
     const dataUrl = canvas.toDataURL('image/png');
@@ -4451,6 +4456,8 @@ async function downloadPreviewPNG() {
     showToast('⚠ ไม่สามารถสร้างภาพได้','err');
     console.error(e);
   } finally {
+    target.style.transform = savedTransform;
+    target.style.margin = savedMargin;
     document.body.removeChild(ov);
   }
 }
