@@ -4254,9 +4254,6 @@ function switchTab(tab,btn){
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('tab-'+tab).classList.add('active');
   if(btn) btn.classList.add('active');
-  // Show/hide the rotate+tab nav block (hidden for settings)
-  const rtb = document.querySelector('.rotate-tab-block');
-  if(rtb) rtb.style.display = tab==='settings' ? 'none' : '';
   if(tab==='residents') renderResGrid();
   if(tab==='leaves'){ renderLeaveSelect(); renderLeaveList(); renderDayoffLockUI(); updateAdminUI(); }
   if(tab==='swap') renderSwapTab();
