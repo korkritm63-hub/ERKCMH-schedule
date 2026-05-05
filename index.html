@@ -321,8 +321,9 @@ th.col-N{min-width:185px;background:#3b0764;border-left:3px solid #8b5cf6;}
   .save-ind span { display: none; } /* แค่แสดง dot */
 
   /* Nav buttons — smaller, scroll horizontally */
-  header > div:last-child { gap: 4px; overflow-x: auto; flex-wrap: nowrap; max-width: 60vw; }
+  header > div:last-child { gap: 4px; }
   .nav-btn { padding: 5px 10px; font-size: 12px; white-space: nowrap; }
+  .tab-nav-bar .nav-btn { padding: 5px 10px; font-size: 12px; }
 
   /* Container — reduce padding */
   .container { padding: 10px 12px; }
@@ -417,6 +418,7 @@ th.col-N{min-width:185px;background:#3b0764;border-left:3px solid #8b5cf6;}
   th.col-date { min-width: 80px; }
   .date-cell { min-width: 80px; }
   .nav-btn { padding: 5px 8px; font-size: 11px; }
+  .tab-nav-bar .nav-btn { padding: 5px 8px; font-size: 11px; }
 }
 /* RESIDENT MANAGEMENT */
 .res-mgmt-card{background:#fff;border:1px solid var(--border);border-radius:10px;overflow:hidden;}
@@ -509,6 +511,12 @@ th.col-N{min-width:185px;background:#3b0764;border-left:3px solid #8b5cf6;}
 .swap-tag.rejected{background:#fee2e2;color:#991b1b;}
 /* ── Swap Admin Panel ──────────────────────────────────────── */
 .swap-admin-card{background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:14px 18px;margin-bottom:14px;}
+/* ── Global Rotate + Tab nav block ─────────────────────────── */
+.rotate-tab-block{box-shadow:var(--shadow-sm);border-radius:var(--radius);margin-bottom:16px;overflow:hidden;}
+.rotate-tab-block .rotate-bar{border-radius:0;margin-bottom:0;box-shadow:none;border-bottom:none;}
+.tab-nav-bar{background:var(--surface2);border:1px solid var(--border);border-top:none;padding:6px 10px;display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;}
+.tab-nav-bar::-webkit-scrollbar{display:none;}
+.tab-nav-bar .nav-btn{font-size:13px;padding:6px 14px;white-space:nowrap;}
 </style>
 </head>
 <body>
@@ -524,17 +532,28 @@ th.col-N{min-width:185px;background:#3b0764;border-left:3px solid #8b5cf6;}
     <div style="display:flex;gap:5px;align-items:center">
       <button id="pv-nav-btn" class="nav-btn" onclick="openPersonalView()" title="ดูตารางเวรของฉัน">👤 My</button>
       <button id="admin-nav-btn" class="nav-btn" style="display:none" title="Admin mode">🔒 Admin</button>
-      <button class="nav-btn active" onclick="switchTab('schedule',this)">📅 ตาราง</button>
-      <button class="nav-btn" onclick="switchTab('residents',this)">👨‍⚕️ Residents</button>
-      <button class="nav-btn" onclick="switchTab('leaves',this)">📋 Dayoff</button>
-      <button class="nav-btn" onclick="switchTab('swap',this)">🔄 Swap</button>
-      <button class="nav-btn" onclick="switchTab('fairness',this)">📊 Fairness</button>
-      <button class="nav-btn" onclick="switchTab('settings',this)">⚙️ ตั้งค่า</button>
+      <button class="nav-btn" onclick="switchTab('settings',this)" title="ตั้งค่าระบบ" style="font-size:16px;padding:5px 10px;">⚙️</button>
     </div>
   </div>
 </header>
 
 <div class="container">
+
+<!-- GLOBAL ROTATE + TAB NAV -->
+<div class="rotate-tab-block">
+  <div class="rotate-bar">
+    <span class="rotate-label">Rotate</span>
+    <div class="rotate-chips" id="rotate-chips"></div>
+    <button class="add-rotate-btn" onclick="openAddRotate()">＋ Add Rotate</button>
+  </div>
+  <div class="tab-nav-bar">
+    <button class="nav-btn active" onclick="switchTab('schedule',this)">📅 ตาราง</button>
+    <button class="nav-btn" onclick="switchTab('residents',this)">👨‍⚕️ Residents</button>
+    <button class="nav-btn" onclick="switchTab('leaves',this)">📋 Dayoff</button>
+    <button class="nav-btn" onclick="switchTab('swap',this)">🔄 Swap</button>
+    <button class="nav-btn" onclick="switchTab('fairness',this)">📊 Fairness</button>
+  </div>
+</div>
 
 <!-- SCHEDULE -->
 <div id="tab-schedule" class="tab-content active">
@@ -570,13 +589,6 @@ th.col-N{min-width:185px;background:#3b0764;border-left:3px solid #8b5cf6;}
         style="border:none;background:transparent;font-family:'Sarabun',sans-serif;font-size:13px;color:var(--text);outline:none;width:100%;">
       <button onclick="clearSearch()" id="search-clear" style="display:none;background:none;border:none;cursor:pointer;color:var(--light);font-size:14px;padding:0;line-height:1;">✕</button>
     </div>
-  </div>
-
-  <!-- ROTATE SELECTOR -->
-  <div class="rotate-bar">
-    <span class="rotate-label">Rotate</span>
-    <div class="rotate-chips" id="rotate-chips"></div>
-    <button class="add-rotate-btn" onclick="openAddRotate()">＋ Add Rotate</button>
   </div>
 
   <!-- SWAP REQUESTS ADMIN PANEL -->
@@ -4242,6 +4254,9 @@ function switchTab(tab,btn){
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('tab-'+tab).classList.add('active');
   if(btn) btn.classList.add('active');
+  // Show/hide the rotate+tab nav block (hidden for settings)
+  const rtb = document.querySelector('.rotate-tab-block');
+  if(rtb) rtb.style.display = tab==='settings' ? 'none' : '';
   if(tab==='residents') renderResGrid();
   if(tab==='leaves'){ renderLeaveSelect(); renderLeaveList(); renderDayoffLockUI(); updateAdminUI(); }
   if(tab==='swap') renderSwapTab();
