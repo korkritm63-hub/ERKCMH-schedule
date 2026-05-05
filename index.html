@@ -1369,7 +1369,8 @@ function createRotate(startStr, endStr=null, customLabel=null) {
     active: Object.fromEntries(RES.map(r=>[r.id, true])),
     sched: Object.fromEntries(Array.from({length:rot.days},(_,i)=>[i+1,{M:[],A:[],N:[]}])),
     confDays: [], // [{date:'YYYY-MM-DD', type:'IH'|'Tox'|'EMS'}]
-    swapRequests: [], // [{id, fromRid, toRid, ri, day, shift, note, status, createdAt}]
+    swapRequests: [], // [{id, fromRid, toRid, fromDay, fromShift, toDay, toShift, note, status, createdAt}]
+    changeLog: [],    // [{ts, action, desc}]
     outsiders: [], // [{id, name, quota, active}]
     outsideFlags: {}, // {d: {shift: [rid, ...]}} — toggle วนนอกแผนก
     dayoffLocked: false, // admin ล็อกรับ dayoff
@@ -1454,6 +1455,7 @@ function loadState() {
         holidays: pr.holidays ?? [],
         confDays: pr.confDays ?? [],
         swapRequests: pr.swapRequests ?? [],
+        changeLog: pr.changeLog ?? [],
         outsiders: pr.outsiders ?? [],
         outsideFlags: pr.outsideFlags ?? {},
         dayoffLocked: pr.dayoffLocked ?? false,
@@ -1813,6 +1815,13 @@ let _pvSwapFromDay = null, _pvSwapFromShift = null;
 let _pvSwapToRid = null, _pvSwapToDay = null, _pvSwapToShift = null;
 let _swapTabRid = null;
 
+function logChange(ri, action, desc) {
+  if (!perRot[ri]) return;
+  if (!perRot[ri].changeLog) perRot[ri].changeLog = [];
+  perRot[ri].changeLog.unshift({ ts: Date.now(), action, desc });
+  if (perRot[ri].changeLog.length > 300) perRot[ri].changeLog.length = 300;
+}
+
 function openPersonalView() {
   _pvPin = ''; _pvRid = null;
   document.getElementById('pv-overlay').style.display = 'flex';
@@ -2075,6 +2084,10 @@ function pvSubmitSwap() {
 function respondSwap(reqId, ri, accept) {
   const req = (perRot[ri]?.swapRequests||[]).find(s=>s.id===reqId); if (!req) return;
   req.status = accept ? 'target_accepted' : 'target_rejected';
+  const fromR=getR(req.fromRid), toR=getR(req.toRid);
+  const sNmS={M:'เช้า',A:'บ่าย',N:'ดึก'};
+  logChange(ri, accept?'swap_target_accept':'swap_target_reject',
+    `${toR?.name||req.toRid} ${accept?'ยอมรับ':'ปฏิเสธ'}การขอสลับจาก ${fromR?.name||req.fromRid} (เวร${sNmS[req.fromShift]})`);
   saveState();
   renderSwapTab();
   renderSwapAdminPanel();
@@ -2203,12 +2216,98 @@ function renderSwapTab() {
       </div>
     </details>` : '';
 
+  // ── Public dashboard: all swap requests ──────────────────────
+  const STATUS_META = {
+    pending_target: { label:'⏳ รอยืนยัน',     bg:'#fef3c7', col:'#92400e' },
+    target_accepted:{ label:'✅ รอ Admin',      bg:'#d1fae5', col:'#065f46' },
+    target_rejected:{ label:'❌ ปฏิเสธ',        bg:'#fee2e2', col:'#991b1b' },
+    admin_approved: { label:'✅ อนุมัติแล้ว',   bg:'#bbf7d0', col:'#14532d' },
+    admin_rejected: { label:'❌ Admin ปฏิเสธ',  bg:'#fecaca', col:'#7f1d1d' },
+  };
+  const allReqs = [...reqs].sort((a,b)=>{
+    const order={pending_target:0,target_accepted:1,target_rejected:2,admin_approved:3,admin_rejected:3};
+    return (order[a.status]??4)-(order[b.status]??4) || b.createdAt-a.createdAt;
+  });
+  const dashboardSec = allReqs.length ? `
+    <div style="margin-bottom:28px;">
+      <div style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8;margin-bottom:12px;">📋 ตารางคำขอสลับเวรทั้งหมด (${allReqs.length})</div>
+      <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:12px;">
+          <thead>
+            <tr style="background:#1e293b;color:#94a3b8;">
+              <th style="padding:8px 10px;text-align:left;border-bottom:1px solid #334155;white-space:nowrap;">ผู้ขอ</th>
+              <th style="padding:8px 10px;text-align:left;border-bottom:1px solid #334155;white-space:nowrap;">เวรที่ขอ</th>
+              <th style="padding:8px 10px;text-align:center;border-bottom:1px solid #334155;white-space:nowrap;">⇄</th>
+              <th style="padding:8px 10px;text-align:left;border-bottom:1px solid #334155;white-space:nowrap;">เป้าหมาย</th>
+              <th style="padding:8px 10px;text-align:left;border-bottom:1px solid #334155;white-space:nowrap;">เวรที่ขอสลับ</th>
+              <th style="padding:8px 10px;text-align:center;border-bottom:1px solid #334155;white-space:nowrap;">สถานะ</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${allReqs.map((req,i)=>{
+              const fromR=getR(req.fromRid), toR=getR(req.toRid);
+              const fromDt=rotDay(ri,req.fromDay||req.day);
+              const toDt=req.toDay?rotDay(ri,req.toDay):null;
+              const sm=STATUS_META[req.status]||{label:req.status,bg:'#f3f4f6',col:'#374151'};
+              const rowBg=i%2===0?'#0f172a':'#1a2335';
+              return `<tr style="background:${rowBg};">
+                <td style="padding:8px 10px;font-weight:700;color:${fromR?.color||'#e2e8f0'};">${fromR?.name||req.fromRid}</td>
+                <td style="padding:8px 10px;color:#e2e8f0;">${sNmS[req.fromShift||req.shift||'M']} ${DOW[fromDt.getDay()]}${fromDt.getDate()}</td>
+                <td style="padding:8px 10px;text-align:center;color:#475569;">⇄</td>
+                <td style="padding:8px 10px;font-weight:700;color:${toR?.color||'#94a3b8'};">${toR?.name||req.toRid||'—'}</td>
+                <td style="padding:8px 10px;color:#e2e8f0;">${toDt?`${sNmS[req.toShift||'M']} ${DOW[toDt.getDay()]}${toDt.getDate()}`:'—'}</td>
+                <td style="padding:8px 10px;text-align:center;">
+                  <span style="background:${sm.bg};color:${sm.col};font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;white-space:nowrap;">${sm.label}</span>
+                </td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>` : `<div style="background:#1e293b;border:1px solid #334155;border-radius:10px;padding:20px;text-align:center;color:#475569;margin-bottom:28px;">ยังไม่มีคำขอสลับเวรใน Rotate นี้</div>`;
+
+  // ── Change log ───────────────────────────────────────────────
+  const logs = perRot[ri]?.changeLog||[];
+  const ACTION_META = {
+    shift_edit:         { icon:'✏️', col:'#60a5fa' },
+    swap_approved:      { icon:'✅', col:'#34d399' },
+    swap_rejected:      { icon:'❌', col:'#f87171' },
+    swap_target_accept: { icon:'👍', col:'#a3e635' },
+    swap_target_reject: { icon:'👎', col:'#fb923c' },
+    auto_schedule:      { icon:'🤖', col:'#c084fc' },
+  };
+  const fmtTs = ts => {
+    const d = new Date(ts);
+    const pad = n => String(n).padStart(2,'0');
+    return `${d.getDate()} ${TH_MONTHS[d.getMonth()+1]} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+  const logSec = `
+    <details style="margin-top:8px;">
+      <summary style="font-size:13px;font-weight:700;color:#94a3b8;cursor:pointer;padding:8px 0;display:flex;align-items:center;gap:8px;">
+        <span>📜 Log การเปลี่ยนแปลง (${logs.length})</span>
+      </summary>
+      <div style="margin-top:10px;max-height:400px;overflow-y:auto;border:1px solid #334155;border-radius:10px;">
+        ${logs.length ? logs.slice(0,200).map((l,i)=>{
+          const am=ACTION_META[l.action]||{icon:'•',col:'#94a3b8'};
+          return `<div style="display:flex;gap:10px;align-items:flex-start;padding:8px 12px;border-bottom:1px solid #1e293b;background:${i%2===0?'#0f172a':'#111827'};">
+            <span style="font-size:14px;flex-shrink:0;">${am.icon}</span>
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:12px;color:${am.col};font-weight:600;">${l.desc||l.action}</div>
+              <div style="font-size:11px;color:#475569;margin-top:1px;">${fmtTs(l.ts)}</div>
+            </div>
+          </div>`;
+        }).join('') : '<div style="padding:16px;text-align:center;color:#475569;font-size:13px;">ยังไม่มีรายการ</div>'}
+      </div>
+    </details>`;
+
   body.innerHTML = `
-    <div style="max-width:600px;margin:0 auto;padding:0 16px;">
+    <div style="max-width:640px;margin:0 auto;padding:0 16px;">
       <div style="font-size:16px;font-weight:800;margin-bottom:20px;">🔄 การขอสลับเวร</div>
+      ${dashboardSec}
       ${loginSec}
       ${adminSec}
       ${historySec}
+      ${logSec}
     </div>`;
 }
 
@@ -2260,8 +2359,12 @@ function approveSwap(reqId, ri) {
       perRot[ri].sched[req.toDay][req.toShift].push(req.fromRid);
   }
   req.status = 'admin_approved';
-  saveState(); renderTable(); renderSwapTab(); renderSwapAdminPanel();
   const fromR=getR(req.fromRid), toR=getR(req.toRid);
+  const sNmS={M:'เช้า',A:'บ่าย',N:'ดึก'};
+  const fdt=rotDay(ri,req.fromDay), tdt=rotDay(ri,req.toDay);
+  logChange(ri,'swap_approved',
+    `Admin อนุมัติ: ${fromR?.name||req.fromRid} เวร${sNmS[req.fromShift]} ${fdt.getDate()} ${TH_MONTHS[fdt.getMonth()+1]} ⇄ ${toR?.name||req.toRid} เวร${sNmS[req.toShift]} ${tdt.getDate()} ${TH_MONTHS[tdt.getMonth()+1]}`);
+  saveState(); renderTable(); renderSwapTab(); renderSwapAdminPanel();
   showToast(`✅ สลับเวร ${fromR?.name||req.fromRid} ⇄ ${toR?.name||req.toRid} สำเร็จ`,'ok');
 }
 
@@ -2269,6 +2372,10 @@ function rejectSwap(reqId, ri) {
   if (guardAdmin()) return;
   const req = (perRot[ri].swapRequests||[]).find(s=>s.id===reqId); if (!req) return;
   req.status = 'admin_rejected';
+  const fromR=getR(req.fromRid), toR=getR(req.toRid);
+  const sNmS={M:'เช้า',A:'บ่าย',N:'ดึก'};
+  logChange(ri,'swap_rejected',
+    `Admin ปฏิเสธ: ${fromR?.name||req.fromRid} ⇄ ${toR?.name||req.toRid||'?'} (เวร${sNmS[req.fromShift||req.shift||'M']})`);
   saveState(); renderSwapTab(); renderSwapAdminPanel();
   showToast('ปฏิเสธคำขอสลับเวรแล้ว','ok');
 }
@@ -3256,6 +3363,7 @@ function autoSchedule(fillMode=true) {
     }
   }
 
+  logChange(ri,'auto_schedule', fillMode ? 'Auto-fill ตาราง (เติมจากของเดิม)' : 'Auto-schedule สร้างตารางใหม่ทั้งหมด');
   saveState(); renderTable(); updateUndoRedoBtns();
   // แสดง post-schedule summary
   setTimeout(() => showPostSchedSummary(ri, fillMode), 300);
@@ -4031,10 +4139,15 @@ function toggleAssign(rid,d,shift){
   if (guardLocked()) return;
   const ri=RI, arr=perRot[ri].sched[d][shift];
   const idx=arr.indexOf(rid);
+  const sNm={M:'เช้า',A:'บ่าย',N:'ดึก'}[shift];
+  const rNm=getR(rid)?.name||rid;
+  const dt=rotDay(ri,d);
+  const dStr=`${dt.getDate()} ${TH_MONTHS[dt.getMonth()+1]}`;
   if(idx>=0){
     // Remove — push undo first
     pushUndo();
     arr.splice(idx,1);
+    logChange(ri,'shift_edit',`ถอด ${rNm} ออกจากเวร${sNm} วันที่ ${dStr}`);
   } else {
     // ตรวจกฎ 2 ข้อเท่านั้น
     // กฎ 1: บ่าย + ดึก วันเดียวกัน
@@ -4051,6 +4164,7 @@ function toggleAssign(rid,d,shift){
     if(alreadyToday(rid,ri,d)) showToast('⚠ Double shift วันนี้','ok');
     pushUndo();
     arr.push(rid);
+    logChange(ri,'shift_edit',`เพิ่ม ${rNm} เข้าเวร${sNm} วันที่ ${dStr}`);
   }
   _shiftCntCache = null; saveState(); openModal(d,shift); renderTable(); updateUndoRedoBtns();
 }
