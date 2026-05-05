@@ -3349,7 +3349,7 @@ function openModal(d,shift){
   const dt=rotDay(ri,d); const wd=dt.getDay();
   const isTu=wd===2, isHol=isSpecialDay(ri,d);
   const assigned=[...(perRot[ri].sched[d][shift]||[])];
-  document.getElementById('modal-h').textContent=`เวร${SNAME[shift]} — ${formatDate(dt)} (วันที่ ${d}/28)`;
+  document.getElementById('modal-h').textContent=`เวร${SNAME[shift]} — ${formatDate(dt)} (วันที่ ${d}/${rot.days||28})`;
   document.getElementById('modal-sub').textContent=`${STIME[shift]} · ${rot.label} ${rot.dateRange}`;
   let infos='';
   if(isHol) infos+=`<div class="info-box orange">🌟 วันหยุด${holName(ri,d)?' — '+holName(ri,d):''}</div>`;
@@ -4404,7 +4404,7 @@ function confirmPromotion() {
 function clearAllData() {
   if (guardAdmin()) return;
   if (!confirm('ยืนยันการล้างข้อมูลทั้งหมด?\nตาราง, คำขอลา, และ Rotate ทั้งหมดจะถูกลบทั้ง Local และ Cloud')) return;
-  ['er28_rotates','er28_perRot','er28_hols','er28_deleted','er28_ts'].forEach(k=>localStorage.removeItem(k));
+  ['er28_rotates','er28_perRot','er28_hols','er28_deleted','er28_ts','er28_res','er28_names','er_onboard_seen'].forEach(k=>localStorage.removeItem(k));
   rotates=[]; perRot=[];
   RI=0;
   // Clear Firestore too
