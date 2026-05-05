@@ -1246,6 +1246,8 @@ function _buildLeaderCache(ri) {
       const sl = perRot[ri].sched[d]?.[s] || [];
       const nonR3 = sl.filter(id => { const rx=getR(id); return rx && rx.year < 3; });
       if (nonR3.length > 0) {
+        // person with fewest EROU so far gets it → same logic as sortAssignedWithLeader
+        nonR3.sort((a, b) => (cache[a]||0) - (cache[b]||0));
         cache[nonR3[0]] = (cache[nonR3[0]] || 0) + 1;
       }
     }
@@ -2036,19 +2038,27 @@ function renderFairness() {
   if (lbl) lbl.textContent = rot.label + ' · ' + rot.dateRange;
   if (!el) return;
 
+  // Pre-compute EROU assignment using running-balance sort — matches _buildLeaderCache & display logic
+  const eroCount = {};
+  for (let d=1; d<=days; d++) {
+    for (const s of SHIFTS) {
+      const sl = perRot[ri].sched[d]?.[s]||[];
+      const nR3 = sl.filter(id=>getR(id)?.year<3);
+      if (nR3.length > 0) {
+        nR3.sort((a,b)=>(eroCount[a]||0)-(eroCount[b]||0));
+        eroCount[nR3[0]] = (eroCount[nR3[0]]||0)+1;
+      }
+    }
+  }
+
   const stats = ar.map(r => {
     const c = shiftCntByType(r.id, ri);
-    let wknd=0, tueM=0, leader=0;
+    let wknd=0, tueM=0;
     for (let d=1; d<=days; d++) {
       if (isSpecialDay(ri,d)) SHIFTS.forEach(s=>{ if((perRot[ri].sched[d]?.[s]||[]).includes(r.id)) wknd++; });
       if (isTue(ri,d) && (perRot[ri].sched[d]?.M||[]).includes(r.id)) tueM++;
-      SHIFTS.forEach(s=>{
-        const sl=perRot[ri].sched[d]?.[s]||[];
-        const nR3=sl.filter(id=>getR(id)?.year<3);
-        if(nR3[0]===r.id) leader++;
-      });
     }
-    return {r, M:c.M, A:c.A, N:c.N, total:c.total, quota:QUOTA[r.year], wknd, tueM, leader};
+    return {r, M:c.M, A:c.A, N:c.N, total:c.total, quota:QUOTA[r.year], wknd, tueM, leader: eroCount[r.id]||0};
   });
 
   let html = '';
