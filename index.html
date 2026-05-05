@@ -3780,139 +3780,166 @@ async function exportToExcel() {
   wb.creator = 'ER Resident Scheduler';
 
   // ─────────────────────────────────────────────────────────────
-  // Sheet 1: ตารางเวร
+  // Sheet 1: ตารางเวร — one cell per person, EROU first
   // ─────────────────────────────────────────────────────────────
-  const ws = wb.addWorksheet(rot.label.replace(/[:\\/?*[\]]/g,'_'), {
-    views: [{ state:'frozen', xSplit:3, ySplit:3 }]
-  });
-  ws.getColumn(1).width = 5;
-  ws.getColumn(2).width = 14;
-  ws.getColumn(3).width = 6;
-  ws.getColumn(4).width = 38;
-  ws.getColumn(5).width = 38;
-  ws.getColumn(6).width = 38;
 
   // ── helper: border ──────────────────────────────────────────
   const thinBorder = (argb='FFE2E8F0') => ({ style:'thin', color:{argb} });
-  const hairBorder = () => ({ style:'hair', color:{argb:'FFE2E8F0'} });
   const cellBorder = (c='FFE2E8F0') => ({ top:thinBorder(c), bottom:thinBorder(c), left:thinBorder(c), right:thinBorder(c) });
 
+  // ── compute max slots per shift ──────────────────────────────
+  let mMax=0, aMax=0, nMax=0;
+  for(let d=1; d<=days; d++){
+    mMax = Math.max(mMax, (perRot[ri].sched[d]?.M||[]).length);
+    aMax = Math.max(aMax, (perRot[ri].sched[d]?.A||[]).length);
+    nMax = Math.max(nMax, (perRot[ri].sched[d]?.N||[]).length);
+  }
+  mMax = Math.max(mMax,1); aMax = Math.max(aMax,1); nMax = Math.max(nMax,1);
+
+  // column index ranges (1-based)
+  const COL_DAY  = 1;
+  const COL_DATE = 2;
+  const M_START  = 3;
+  const A_START  = M_START + mMax;
+  const N_START  = A_START + aMax;
+  const TOTAL_COLS = 2 + mMax + aMax + nMax;
+
+  const ws = wb.addWorksheet(rot.label.replace(/[:\\/?*[\]]/g,'_'), {
+    views: [{ state:'frozen', xSplit:2, ySplit:3 }]
+  });
+  ws.getColumn(COL_DAY).width  = 6;
+  ws.getColumn(COL_DATE).width = 10;
+  for(let c=M_START; c<=TOTAL_COLS; c++) ws.getColumn(c).width = 11;
+
   // ── Row 1: Title ─────────────────────────────────────────────
-  ws.mergeCells(1,1,1,6);
+  ws.mergeCells(1, 1, 1, TOTAL_COLS);
   const r1 = ws.getCell(1,1);
-  r1.value = 'ตารางเวร Resident ER · โรงพยาบาลจุฬาลงกรณ์';
-  r1.font  = { bold:true, size:14, name:'Sarabun', color:{argb:'FF0F172A'} };
-  r1.alignment = { horizontal:'left', vertical:'middle' };
-  ws.getRow(1).height = 24;
+  r1.value = `ตารางเวร แพทย์ประจำบ้าน ${rot.label} (${rot.dateRange})`;
+  r1.font  = { bold:true, size:13, name:'Sarabun', color:{argb:'FF0F172A'} };
+  r1.alignment = { horizontal:'center', vertical:'middle' };
+  ws.getRow(1).height = 22;
 
-  // ── Row 2: Subtitle ──────────────────────────────────────────
-  ws.mergeCells(2,1,2,3);
-  const r2l = ws.getCell(2,1);
-  r2l.value = rot.label;
-  r2l.font  = { size:10, name:'Sarabun', color:{argb:'FF475569'} };
-  r2l.alignment = { vertical:'middle' };
-  ws.mergeCells(2,4,2,6);
-  const r2r = ws.getCell(2,4);
-  r2r.value = `${rot.dateRange}  ·  รวม ${days} วัน`;
-  r2r.font  = { bold:true, size:10, name:'Sarabun', color:{argb:'FFDC2626'} };
-  r2r.alignment = { horizontal:'right', vertical:'middle' };
-  ws.getRow(2).height = 18;
+  // ── Row 2: Shift group headers ───────────────────────────────
+  // วัน + วันที่ (empty header)
+  [COL_DAY, COL_DATE].forEach(c=>{
+    const cell = ws.getCell(2,c);
+    cell.fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FF0F172A'} };
+    cell.border = cellBorder('FF334155');
+  });
 
-  // ── Row 3: Column headers ────────────────────────────────────
-  const HDR = [
-    [1,'#',       'FF0F172A','FFE2E8F0'],
-    [2,'วันที่',  'FF0F172A','FFE2E8F0'],
-    [3,'วัน',     'FF0F172A','FFE2E8F0'],
-    [4,'☀ เช้า 08–16', 'FF78350F','FFFEF3C7'],
-    [5,'🌆 บ่าย 16–24','FF1E3A8A','FFDBEAFE'],
-    [6,'🌙 ดึก 00–08', 'FF3B0764','FFEDE9FE'],
+  const SHIFT_HDR = [
+    [M_START, mMax, '☀ Morning 8.00-16.00',  'FF78350F','FFFEF3C7'],
+    [A_START, aMax, '🌆 Afternoon 16.00-0.00','FF1E3A8A','FFDBEAFE'],
+    [N_START, nMax, '🌙 Night 0.00-8.00',      'FF3B0764','FFEDE9FE'],
   ];
-  HDR.forEach(([col,val,bg,fc])=>{
-    const c = ws.getCell(3,col);
-    c.value = val;
-    c.font  = { bold:true, size:9, name:'Sarabun', color:{argb:fc} };
+  SHIFT_HDR.forEach(([start, span, label, bg, fg])=>{
+    ws.mergeCells(2, start, 2, start+span-1);
+    const c = ws.getCell(2, start);
+    c.value = label;
+    c.font  = { bold:true, size:10, name:'Sarabun', color:{argb:fg} };
     c.fill  = { type:'pattern', pattern:'solid', fgColor:{argb:bg} };
     c.alignment = { horizontal:'center', vertical:'middle' };
     c.border = cellBorder('FF334155');
   });
-  ws.getRow(3).height = 18;
+  ws.getRow(2).height = 18;
 
-  // ── Build rich text for a shift cell ────────────────────────
-  const buildRich = (d, shift) => {
-    const ids = perRot[ri].sched[d]?.[shift]||[];
-    if (!ids.length) return { richText:[{ text:'—', font:{color:{argb:'FFCBD5E1'},size:8,name:'Sarabun'} }] };
+  // ── Row 3: Slot sub-headers (EROU, 2, 3, …) ──────────────────
+  [COL_DAY, COL_DATE].forEach(c=>{
+    const cell = ws.getCell(3,c);
+    cell.fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FF1E293B'} };
+    cell.border = cellBorder('FF334155');
+  });
+
+  SHIFT_HDR.forEach(([start, span, , bg])=>{
+    for(let i=0; i<span; i++){
+      const c = ws.getCell(3, start+i);
+      c.value = i===0 ? 'EROU ⭐' : String(i+1);
+      c.font  = { bold:true, size:9, name:'Sarabun',
+                  color:{argb: i===0 ? 'FFFEF3C7' : 'FFE2E8F0'} };
+      c.fill  = { type:'pattern', pattern:'solid',
+                  fgColor:{argb: i===0 ? 'FF92400E' : 'FF1E293B'} };
+      c.alignment = { horizontal:'center', vertical:'middle' };
+      c.border = cellBorder('FF334155');
+    }
+  });
+  ws.getRow(3).height = 16;
+
+  // ── helper: sorted ids with EROU first ───────────────────────
+  const getOrdered = (d, sh) => {
+    const ids = perRot[ri].sched[d]?.[sh]||[];
+    if(!ids.length) return [];
     const sorted = sortAssignedWithLeader(ids, ri);
     const leaderRid = sorted.find(id=>getR(id)?.year<3);
-    // EROU (leader) ขึ้นก่อน ตามด้วยคนอื่น
-    const ordered = leaderRid
-      ? [leaderRid, ...sorted.filter(id=>id!==leaderRid)]
-      : sorted;
-    const parts = [];
-    ordered.forEach((id,idx)=>{
-      const outsider = (perRot[ri].outsiders||[]).find(o=>o.id===id);
-      const sep = idx>0 ? '\n' : '';
-      if (outsider) {
-        parts.push({ text:`${sep}🏥 ${outsider.name}`, font:{color:{argb:'FF7C3AED'},bold:true,size:9,name:'Sarabun'} });
-        return;
-      }
-      const r=getR(id); if(!r) return;
-      const isL = id===leaderRid;
-      parts.push({ text:`${sep}${isL?'⭐ ':''}R${r.year} ${r.name}`, font:{color:{argb:cssToArgb(r.color)},bold:isL,size:9,name:'Sarabun'} });
-    });
-    return { richText:parts };
+    return leaderRid ? [leaderRid, ...sorted.filter(id=>id!==leaderRid)] : sorted;
   };
 
-  // ── Data rows ────────────────────────────────────────────────
-  for (let d=1; d<=days; d++) {
-    const dt  = rotDay(ri,d);
-    const wd  = dt.getDay();
-    const isWk  = wd===0||wd===6;
-    const isHol = isHoliday(ri,d);
-    const isTu  = wd===2;
-    const isSp  = isWk||isHol;
-    const ds    = rotDayStr(ri,d);
+  // ── Data rows (row 4 onward) ─────────────────────────────────
+  for(let d=1; d<=days; d++){
+    const dt     = rotDay(ri,d);
+    const wd     = dt.getDay();
+    const isWk   = wd===0||wd===6;
+    const isHol  = isHoliday(ri,d);
+    const isTu   = wd===2;
+    const isSp   = isWk||isHol;
+    const ds     = rotDayStr(ri,d);
     const isConf = isTu||(perRot[ri].confDays||[]).some(c=>c.date===ds);
-    const rowBg = isHol?'FFFFF7ED':isWk?'FFFFF5F5':d%2===0?'FFF8FAFC':'FFFFFFFF';
-    const dayBg = isHol?'FFFED7AA':isWk?'FFFECACA':'FFF1F5F9';
-    const dayFg = isHol?'FF9A3412':isWk?'FFB91C1C':'FF334155';
-
-    const mCnt = (perRot[ri].sched[d]?.M||[]).length;
-    const aCnt = (perRot[ri].sched[d]?.A||[]).length;
-    const nCnt = (perRot[ri].sched[d]?.N||[]).length;
-    const rowH = Math.max(16, Math.max(mCnt,aCnt,nCnt,1)*14);
+    const rowBg  = isHol?'FFFFF7ED':isWk?'FFFFF5F5':d%2===0?'FFF8FAFC':'FFFFFFFF';
+    const dayBg  = isHol?'FFFED7AA':isWk?'FFFECACA':'FFF1F5F9';
+    const dayFg  = isHol?'FF9A3412':isWk?'FFB91C1C':'FF334155';
+    const DOW_FULL = ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'];
 
     const rowIdx = d+3;
-    ws.getRow(rowIdx).height = rowH;
+    ws.getRow(rowIdx).height = 16;
 
-    // # col
-    const nc = ws.getCell(rowIdx,1);
-    nc.value = d; nc.font={size:8,name:'Sarabun',color:{argb:'FF94A3B8'}};
-    nc.fill={type:'pattern',pattern:'solid',fgColor:{argb:rowBg}};
-    nc.alignment={horizontal:'center',vertical:'top'}; nc.border=cellBorder();
+    // วัน
+    const dayC = ws.getCell(rowIdx, COL_DAY);
+    dayC.value = DOW_FULL[wd];
+    dayC.font  = { size:9, bold:isSp, name:'Sarabun', color:{argb:dayFg} };
+    dayC.fill  = { type:'pattern', pattern:'solid', fgColor:{argb:dayBg} };
+    dayC.alignment = { horizontal:'center', vertical:'middle' };
+    dayC.border = cellBorder();
 
-    // วันที่ col
-    const dc = ws.getCell(rowIdx,2);
-    dc.value=`${dt.getDate()} ${MO[dt.getMonth()+1]}${isSp?' ★':''}`;
-    dc.font={size:9,bold:isSp,name:'Sarabun',color:{argb:dayFg}};
-    dc.fill={type:'pattern',pattern:'solid',fgColor:{argb:dayBg}};
-    dc.alignment={horizontal:'left',vertical:'top'}; dc.border=cellBorder();
+    // วันที่
+    const dateC = ws.getCell(rowIdx, COL_DATE);
+    dateC.value = `${dt.getDate()} ${MO[dt.getMonth()+1]}${isSp?' ★':''}${isConf?' 📋':''}`;
+    dateC.font  = { size:9, bold:isSp, name:'Sarabun', color:{argb:dayFg} };
+    dateC.fill  = { type:'pattern', pattern:'solid', fgColor:{argb:dayBg} };
+    dateC.alignment = { horizontal:'left', vertical:'middle' };
+    dateC.border = cellBorder();
 
-    // วัน col
-    const wc = ws.getCell(rowIdx,3);
-    wc.value=DOW_TH[wd]+(isConf?'\n📋':'');
-    wc.font={size:9,bold:isSp,name:'Sarabun',color:{argb:dayFg}};
-    wc.fill={type:'pattern',pattern:'solid',fgColor:{argb:dayBg}};
-    wc.alignment={horizontal:'center',vertical:'top',wrapText:true}; wc.border=cellBorder();
+    // shift slots
+    [[M_START,'M',mMax],[A_START,'A',aMax],[N_START,'N',nMax]].forEach(([start,sh,maxSlots])=>{
+      const ordered = getOrdered(d, sh);
+      for(let slot=0; slot<maxSlots; slot++){
+        const cell = ws.getCell(rowIdx, start+slot);
+        const id   = ordered[slot];
+        const confBg = isConf&&sh==='M' ? 'FFFEFCE8' : rowBg;
 
-    // shift cols
-    ['M','A','N'].forEach((sh,si)=>{
-      const sc = ws.getCell(rowIdx,4+si);
-      sc.value = buildRich(d,sh);
-      sc.fill  = { type:'pattern',pattern:'solid', fgColor:{argb: isConf&&sh==='M'?'FFFEFCE8':rowBg} };
-      sc.alignment = { vertical:'top', wrapText:true };
-      sc.border = isConf&&sh==='M'
-        ? { top:thinBorder('FF93C5FD'),bottom:thinBorder('FF93C5FD'),left:thinBorder('FF93C5FD'),right:thinBorder('FF93C5FD') }
-        : cellBorder();
+        if(!id){
+          cell.value = '';
+          cell.fill  = { type:'pattern', pattern:'solid', fgColor:{argb: confBg} };
+        } else {
+          const outsider = (perRot[ri].outsiders||[]).find(o=>o.id===id);
+          if(outsider){
+            cell.value = `🏥 ${outsider.name}`;
+            cell.font  = { size:9, name:'Sarabun', color:{argb:'FF7C3AED'}, bold:true };
+            cell.fill  = { type:'pattern', pattern:'solid', fgColor:{argb:'FFFAF5FF'} };
+          } else {
+            const r = getR(id);
+            if(r){
+              const isL = slot===0 && ordered[0]===id && getR(id)?.year<3;
+              cell.value = (isL?'⭐ ':'') + r.name;
+              cell.font  = { size:9, name:'Sarabun', color:{argb:cssToArgb(r.color)}, bold:isL };
+              cell.fill  = { type:'pattern', pattern:'solid', fgColor:{argb:cssToArgb(r.bg)} };
+            }
+          }
+        }
+        cell.alignment = { horizontal:'center', vertical:'middle' };
+        cell.border = isConf&&sh==='M'
+          ? { top:thinBorder('FF93C5FD'), bottom:thinBorder('FF93C5FD'),
+              left:thinBorder('FF93C5FD'), right:thinBorder('FF93C5FD') }
+          : cellBorder();
+      }
     });
   }
 
