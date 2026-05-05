@@ -2112,10 +2112,21 @@ function respondSwap(reqId, ri, accept) {
 function swapTabPinLogin() {
   const inp = document.getElementById('swap-tab-pin-input');
   const errEl = document.getElementById('swap-tab-pin-err');
-  const pin = inp?.value?.trim();
-  if (!pin || pin.length !== 4) { if(errEl) errEl.textContent = 'กรุณาใส่ PIN 4 หลัก'; return; }
-  const matched = RES.find(r => r.pin === pin);
-  if (!matched) { if(errEl) errEl.textContent = 'PIN ไม่ถูกต้อง'; return; }
+  const pin = (inp?.value||'').trim().replace(/\D/g,'');
+  if (!pin || pin.length !== 4) {
+    const msg = 'กรุณาใส่ PIN ตัวเลข 4 หลัก';
+    if (errEl) { errEl.textContent = msg; errEl.style.display='block'; }
+    showToast('🔐 ' + msg, 'warn');
+    return;
+  }
+  const matched = RES.find(r => String(r.pin) === pin);
+  if (!matched) {
+    const msg = 'PIN ไม่ถูกต้อง — ลองอีกครั้ง';
+    if (errEl) { errEl.textContent = msg; errEl.style.display='block'; }
+    showToast('❌ ' + msg, 'err');
+    if (inp) { inp.value=''; inp.focus(); }
+    return;
+  }
   _swapTabRid = matched.id;
   renderSwapTab();
 }
@@ -2140,7 +2151,7 @@ function renderSwapTab() {
             onkeydown="if(event.key==='Enter')swapTabPinLogin()">
           <button onclick="swapTabPinLogin()" style="padding:8px 16px;background:#1d4ed8;color:#fff;${BNS}">เข้าสู่ระบบ</button>
         </div>
-        <div id="swap-tab-pin-err" style="color:#f87171;font-size:12px;min-height:16px;margin-top:4px;"></div>
+        <div id="swap-tab-pin-err" style="display:none;color:#fff;font-size:13px;font-weight:600;background:#dc2626;border-radius:6px;padding:6px 10px;margin-top:8px;"></div>
       </div>`;
   } else {
     const r = getR(_swapTabRid);
