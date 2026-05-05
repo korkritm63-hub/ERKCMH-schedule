@@ -41,9 +41,9 @@ const db = getFirestore(app);
 const SCHED_DOC = doc(db, 'scheduler', 'main');
 
 // ── Save to Firestore ─────────────────────────────────────────
-window._fbSave = async (rotatesData, perRotData, adminPin='') => {
+window._fbSave = async (rotatesData, perRotData, adminPin='', ts=null) => {
   try {
-    await setDoc(SCHED_DOC, { rotates: rotatesData, perRot: perRotData, adminPin, updatedAt: Date.now() }, { merge: false });
+    await setDoc(SCHED_DOC, { rotates: rotatesData, perRot: perRotData, adminPin, updatedAt: ts ?? Date.now() }, { merge: false });
     return true;
   } catch(e) { console.error('Firebase save error', e); return false; }
 };
@@ -1290,7 +1290,6 @@ function createRotate(startStr, endStr=null, customLabel=null) {
   perRot.push({
     active: Object.fromEntries(RES.map(r=>[r.id, true])),
     sched: Object.fromEntries(Array.from({length:rot.days},(_,i)=>[i+1,{M:[],A:[],N:[]}])),
-    specialBlocks: [], // reserved
     confDays: [], // [{date:'YYYY-MM-DD', type:'IH'|'Tox'|'EMS'}]
     outsiders: [], // [{id, name, quota, active}]
     outsideFlags: {}, // {d: {shift: [rid, ...]}} — toggle วนนอกแผนก
@@ -1339,9 +1338,12 @@ function saveState() {
     clearTimeout(_fbSaveTimer);
     _fbSaveTimer = setTimeout(async () => {
       if (window._fbReady && window._fbSave) {
+        const ts = Date.now();
+        localStorage.setItem('er28_ts', String(ts)); // stamp before write so echo is ignored
         const ok = await window._fbSave(
           rotatesMeta,
-          JSON.parse(JSON.stringify(perRot))
+          JSON.parse(JSON.stringify(perRot)),
+          '', ts
         );
         setSaveInd(ok);
         if (!ok) showToast('⚠ Cloud save ล้มเหลว (บันทึกเฉพาะ local)','err');
@@ -1372,7 +1374,6 @@ function loadState() {
         lvs: pr.lvs ?? [],
         holidays: pr.holidays ?? [],
         confDays: pr.confDays ?? [],
-        specialBlocks: pr.specialBlocks ?? [],
         outsiders: pr.outsiders ?? [],
         outsideFlags: pr.outsideFlags ?? {},
         dayoffLocked: pr.dayoffLocked ?? false,
@@ -2320,13 +2321,9 @@ function autoSchedule(fillMode=true) {
   const streak = {};
   ar.forEach(r => streak[r.id] = 0);
 
-  // ── Block / availability checks ──────────────────────────────
-  function isBlockedCP(rid, d) { return false; } // special blocks UI removed
-
   function canAssign(rid, d, shift, excl=[], allowDouble=false) {
     if (excl.includes(rid)) return false;
     if (isUnavailForShift(rid, ri, d, shift)) return false;
-    if (isBlockedCP(rid, d)) return false;
     if (rem[rid] <= 0) return false;
     // กฎ 1: บ่าย + ดึก วันเดียวกัน ห้าม
     const todayA = (perRot[ri].sched[d]?.A||[]).includes(rid);
