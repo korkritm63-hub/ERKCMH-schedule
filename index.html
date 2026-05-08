@@ -5098,11 +5098,19 @@ function confirmPromotion() {
   // Remove from RES
   for (let i=RES.length-1;i>=0;i--) { if(RES[i].year===3) RES.splice(i,1); } invalidateResMap();
 
-  // 2. R2 → R3
-  RES.filter(r=>r.year===2).forEach(r=>{ r.year=3; });
+  // 2. R2 → R3 (update colors to year-3 palette)
+  RES.filter(r=>r.year===2).forEach((r, i) => {
+    r.year = 3;
+    const p = COLOR_PALETTES[3][i % COLOR_PALETTES[3].length];
+    r.color = p.color; r.bg = p.bg; r.border = p.border;
+  });
 
-  // 3. R1 → R2
-  RES.filter(r=>r.year===1).forEach(r=>{ r.year=2; });
+  // 3. R1 → R2 (update colors to year-2 palette)
+  RES.filter(r=>r.year===1).forEach((r, i) => {
+    r.year = 2;
+    const p = COLOR_PALETTES[2][i % COLOR_PALETTES[2].length];
+    r.color = p.color; r.bg = p.bg; r.border = p.border;
+  });
 
   // 4. เพิ่ม R1 ใหม่
   const palette1 = COLOR_PALETTES[1];
